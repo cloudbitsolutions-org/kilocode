@@ -1,6 +1,6 @@
 {
   "name": "@kilocode/zara-ui",
-  "version": "7.4.7",
+  "version": "7.4.8",
   "private": false,
   "type": "module",
   "files": [
@@ -15,15 +15,18 @@
   },
   "dependencies": {
     "@kilocode/kilo-i18n": "workspace:*",
+    "@kilocode/kilo-indexing": "workspace:*",
     "@kilocode/kilo-memory": "workspace:*",
     "@kilocode/kilo-ui": "workspace:*",
     "@kilocode/kilo-web-ui": "workspace:*",
     "@kilocode/sdk": "workspace:*",
+    "@opencode-ai/ui": "workspace:*",
     "@pierre/diffs": "catalog:",
     "@solidjs/router": "catalog:",
     "@types/qrcode": "1.5.6",
     "qrcode": "1.5.4",
     "solid-js": "catalog:",
+    "virtua": "catalog:",
     "yaml": "2.8.3"
   },
   "devDependencies": {

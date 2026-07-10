@@ -19,8 +19,8 @@ echo "Building CLI binary packages (this may take a minute)..."
 (cd packages/opencode && bun run script/build.ts)
 
 # Temporary `.npmrc` for authentication
-echo "//npm.pkg.github.com/:_authToken=${NPM_TOKEN}" > .npmrc
-echo "@${ORG}:registry=https://npm.pkg.github.com" >> .npmrc
+echo "//npm.pkg.github.com/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+echo "@${ORG}:registry=https://npm.pkg.github.com" >> ~/.npmrc
 
 echo "Dynamically rewriting scope from $OLD_SCOPE to $NEW_SCOPE..."
 
@@ -52,12 +52,16 @@ replace_scope() {
       resolveDeps(pkg.devDependencies);
       resolveDeps(pkg.peerDependencies);
       pkg.private = false;
-      fs.writeFileSync(file, JSON.stringify(pkg, null, 2));
+      if (pkg.repository && typeof pkg.repository === 'object') {
+        pkg.repository.url = 'git+https://github.com/cloudbitsolutions-org/kilocode.git';
+      } else if (typeof pkg.repository === 'string') {
+        pkg.repository = 'git+https://github.com/cloudbitsolutions-org/kilocode.git';
+      }
+      let newContent = JSON.stringify(pkg, null, 2);
+      newContent = newContent.replace(/\"name\": \"$OLD_SCOPE\//g, '\"name\": \"$NEW_SCOPE\/');
+      newContent = newContent.replace(/\"$OLD_SCOPE\//g, '\"$NEW_SCOPE\/');
+      fs.writeFileSync(file, newContent);
     "
-    # Replace the scope in the file
-    sed -i '' "s/\"name\": \"$OLD_SCOPE\//\"name\": \"$NEW_SCOPE\//g" "$package_dir/package.json"
-    # Also replace dependencies that point to internal packages (e.g. workspace dependencies)
-    sed -i '' "s/\"$OLD_SCOPE\//\"$NEW_SCOPE\//g" "$package_dir/package.json"
   fi
 }
 
@@ -95,6 +99,6 @@ for pkg in "${PACKAGES[@]}"; do
 done
 
 # Clean up .npmrc
-rm .npmrc
+rm ~/.npmrc
 
 echo "Successfully published to GitHub Packages!"

@@ -38,5 +38,6 @@ jobs:
 
       - name: Publish SDK
         env:
-          NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          KILO_SKIP_BUNDLED_BWRAP: "1"
         run: ./publish-sdk.sh
