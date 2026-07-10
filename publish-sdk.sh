@@ -13,6 +13,8 @@ OLD_SCOPE="@kilocode"
 NEW_SCOPE="@$ORG"
 
 echo "Building SDK packages..."
+export KILO_CONSOLE_BASE="/console/"
+export KILO_ASSISTANT_UI_BASE="/assistant-ui/"
 bun turbo run build --filter=@kilocode/sdk --filter=@kilocode/zara-ui --filter=@kilocode/kilo-console
 
 echo "Building CLI binary packages (this may take a minute)..."
