@@ -13,7 +13,7 @@ OLD_SCOPE="@kilocode"
 NEW_SCOPE="@$ORG"
 
 echo "Building SDK packages..."
-bun turbo run build --filter=@kilocode/sdk --filter=@kilocode/zara-ui
+bun turbo run build --filter=@kilocode/sdk --filter=@kilocode/zara-ui --filter=@kilocode/kilo-console
 
 # Temporary `.npmrc` for authentication
 echo "//npm.pkg.github.com/:_authToken=${NPM_TOKEN}" > .npmrc
@@ -48,6 +48,7 @@ replace_scope() {
       resolveDeps(pkg.dependencies);
       resolveDeps(pkg.devDependencies);
       resolveDeps(pkg.peerDependencies);
+      pkg.private = false;
       fs.writeFileSync(file, JSON.stringify(pkg, null, 2));
     "
     # Replace the scope in the file
@@ -64,7 +65,7 @@ restore_scope() {
   fi
 }
 
-PACKAGES=("packages/sdk/js" "packages/zara-ui")
+PACKAGES=("packages/sdk/js" "packages/zara-ui" "packages/kilo-console")
 
 # Rename scopes
 for pkg in "${PACKAGES[@]}"; do
