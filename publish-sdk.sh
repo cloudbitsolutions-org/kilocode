@@ -8,7 +8,7 @@ if [ -z "$NPM_TOKEN" ]; then
   exit 1
 fi
 
-ORG="cloudbitsolutions-zara"
+ORG="cloudbitsolutions-org"
 OLD_SCOPE="@kilocode"
 NEW_SCOPE="@$ORG"
 
@@ -27,6 +27,29 @@ replace_scope() {
   if [ -f "$package_dir/package.json" ]; then
     # Create backup
     cp "$package_dir/package.json" "$package_dir/package.json.bak"
+    # Process dependencies (remove workspace:*, resolve catalog:)
+    node -e "
+      const fs = require('fs');
+      const file = '$package_dir/package.json';
+      const rootFile = 'package.json';
+      const pkg = JSON.parse(fs.readFileSync(file));
+      const rootPkg = JSON.parse(fs.readFileSync(rootFile));
+      const catalog = rootPkg.workspaces?.catalog || {};
+      function resolveDeps(deps) {
+        if (!deps) return;
+        for (const dep in deps) {
+          if (deps[dep].startsWith('workspace:')) {
+            delete deps[dep];
+          } else if (deps[dep] === 'catalog:') {
+            deps[dep] = catalog[dep] || '*';
+          }
+        }
+      }
+      resolveDeps(pkg.dependencies);
+      resolveDeps(pkg.devDependencies);
+      resolveDeps(pkg.peerDependencies);
+      fs.writeFileSync(file, JSON.stringify(pkg, null, 2));
+    "
     # Replace the scope in the file
     sed -i '' "s/\"name\": \"$OLD_SCOPE\//\"name\": \"$NEW_SCOPE\//g" "$package_dir/package.json"
     # Also replace dependencies that point to internal packages (e.g. workspace dependencies)
@@ -41,7 +64,7 @@ restore_scope() {
   fi
 }
 
-PACKAGES=("packages/sdk" "packages/zara-ui")
+PACKAGES=("packages/sdk/js" "packages/zara-ui")
 
 # Rename scopes
 for pkg in "${PACKAGES[@]}"; do
