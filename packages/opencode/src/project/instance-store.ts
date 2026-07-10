@@ -100,12 +100,10 @@ export const layer: Layer.Layer<Service, never, Project.Service | InstanceBootst
 
     const disposeEntry = Effect.fnUntraced(function* (directory: string, entry: Entry, ctx: InstanceContext) {
       if (cache.get(directory) !== entry) return false
-      // kilocode_change start - remove disposed entries even when event publication fails
-      const exit = yield* Effect.exit(disposeContext(ctx))
-      const removed = yield* removeEntry(directory, entry)
-      yield* exit
-      return removed
-      // kilocode_change end
+      yield* disposeContext(ctx)
+      if (cache.get(directory) !== entry) return false
+      cache.delete(directory)
+      return true
     })
 
     const load = (input: LoadInput): Effect.Effect<InstanceContext> => {
@@ -165,10 +163,8 @@ export const layer: Layer.Layer<Service, never, Project.Service | InstanceBootst
 
     const disposeAllOnce = Effect.fnUntraced(function* () {
       yield* Effect.logInfo("disposing all instances")
-      // kilocode_change start - dispose independent worktrees concurrently without interrupting siblings
-      const entries = [...cache.entries()]
-      const exits = yield* Effect.forEach(
-        entries,
+      yield* Effect.forEach(
+        [...cache.entries()],
         (item) =>
           Effect.gen(function* () {
             const exit = yield* Deferred.await(item[1].deferred).pipe(Effect.exit)
@@ -180,18 +176,9 @@ export const layer: Layer.Layer<Service, never, Project.Service | InstanceBootst
               return
             }
             yield* disposeEntry(item[0], item[1], exit.value)
-          }).pipe(Effect.exit),
-        { concurrency: 4 },
-      ).pipe(Effect.uninterruptible)
-      for (const [index, exit] of exits.entries()) {
-        if (Exit.isSuccess(exit)) continue
-        yield* Effect.logWarning("instance dispose failed").pipe(
-          Effect.annotateLogs({ key: entries[index]![0], cause: exit.cause }),
-        )
-      }
-      const failure = exits.find(Exit.isFailure)
-      if (failure) yield* failure
-      // kilocode_change end
+          }),
+        { discard: true },
+      )
     })
 
     const cachedDisposeAll = yield* Effect.cachedWithTTL(disposeAllOnce(), Duration.zero)

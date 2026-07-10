@@ -269,6 +269,9 @@ export function GhosttyTerminal(props: { query: Query; pty: string; active?: boo
       return true
     }
 
+    let reconnectAttempts = 0
+    let reconnectTimer: number | undefined
+
     const run = async () => {
       host.replaceChildren()
       await ready()
@@ -306,35 +309,59 @@ export function GhosttyTerminal(props: { query: Query; pty: string; active?: boo
         if (props.active) term?.focus()
       })
 
-      ws = new WebSocket(ptyWsUrl(props.query, props.pty))
-      ws.binaryType = "arraybuffer"
-      ws.onmessage = (event) => {
-        if (disposed || !term) return
-        if (typeof event.data === "string") {
-          term.write(event.data)
-          return
+      const connect = () => {
+        if (disposed) return
+        ws = new WebSocket(ptyWsUrl(props.query, props.pty))
+        ws.binaryType = "arraybuffer"
+        
+        ws.onopen = () => {
+          reconnectAttempts = 0
+          setFailure(undefined)
         }
-        if (event.data instanceof ArrayBuffer) {
-          const bytes = new Uint8Array(event.data)
-          if (done(bytes)) return
-          term.write(bytes)
-          return
-        }
-        if (event.data instanceof Blob) {
-          void event.data.arrayBuffer().then((buffer) => {
-            if (disposed || !term) return
-            const bytes = new Uint8Array(buffer)
+        
+        ws.onmessage = (event) => {
+          if (disposed || !term) return
+          if (typeof event.data === "string") {
+            term.write(event.data)
+            return
+          }
+          if (event.data instanceof ArrayBuffer) {
+            const bytes = new Uint8Array(event.data)
             if (done(bytes)) return
             term.write(bytes)
-          })
+            return
+          }
+          if (event.data instanceof Blob) {
+            void event.data.arrayBuffer().then((buffer) => {
+              if (disposed || !term) return
+              const bytes = new Uint8Array(buffer)
+              if (done(bytes)) return
+              term.write(bytes)
+            })
+          }
+        }
+        
+        ws.onerror = () => {
+          if (reconnectAttempts === 0) setFailure("Terminal WebSocket connection failed")
+        }
+        
+        ws.onclose = (event) => {
+          if (disposed) return
+          
+          if (event.code !== 1006) {
+            setFailure("Terminal disconnected")
+            props.onExit?.()
+            return
+          }
+          
+          const delay = Math.min(1000 * 2 ** reconnectAttempts, 10000)
+          reconnectAttempts += 1
+          setFailure(`Terminal disconnected; reconnecting in ${Math.ceil(delay / 1000)}s...`)
+          reconnectTimer = window.setTimeout(connect, delay)
         }
       }
-      ws.onerror = () => setFailure("Terminal WebSocket connection failed")
-      ws.onclose = () => {
-        if (disposed) return
-        setFailure("Terminal disconnected")
-        props.onExit?.()
-      }
+
+      connect()
     }
 
     void run().catch((err) => {
@@ -344,6 +371,7 @@ export function GhosttyTerminal(props: { query: Query; pty: string; active?: boo
 
     onCleanup(() => {
       disposed = true
+      if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer)
       data?.dispose()
       size?.dispose()
       fit?.dispose()

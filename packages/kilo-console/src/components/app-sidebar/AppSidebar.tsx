@@ -139,7 +139,6 @@ export function AppSidebar(props: Props) {
   const nav = () => [{ href: "/projects", label: "Projects", name: "projects", path: "/projects" }] as const
   const bottom = () =>
     [
-      { href: "/profile", label: "Profile", name: "profile", path: "/profile" },
       { href: settings(), label: "Settings", name: "settings", path: "/settings" },
     ] as const
 

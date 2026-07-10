@@ -616,7 +616,7 @@ export async function loadProjectDiffFile(input: Query, dir: string, file: strin
   return demand("Worktree diff file", result)
 }
 
-export async function createProjectPty(input: Query, dir: string, title = "Kilo session"): Promise<ProjectPtyInfo> {
+export async function createProjectPty(input: Query, dir: string, title = "Zara session"): Promise<ProjectPtyInfo> {
   const sdk = client({ url: input.url, dir })
   const result = await sdk.pty.create({ directory: dir, command: "kilo", cwd: dir, title })
   return demand("Create terminal", result)

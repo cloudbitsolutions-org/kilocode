@@ -1011,6 +1011,7 @@ export const ConfigProvidersResult = Schema.Struct({
 export type ConfigProvidersResult = Types.DeepMutable<Schema.Schema.Type<typeof ConfigProvidersResult>>
 
 export function toPublicInfo(provider: Info): Info {
+  if (!provider) return provider
   return JSON.parse(
     JSON.stringify(provider, (_, value) => {
       if (typeof value === "function" || typeof value === "symbol" || value === undefined) return undefined
@@ -1476,6 +1477,7 @@ export const layer = Layer.effect(
           const stored = yield* auth.get(providerID).pipe(Effect.orDie)
           if (!stored) continue
           if (!plugin.auth.loader) continue
+          if (!database[providerID]) continue
 
           const options = yield* Effect.promise(() =>
             plugin.auth!.loader!(

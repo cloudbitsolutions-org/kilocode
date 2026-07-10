@@ -30,14 +30,7 @@ const tui: TuiPlugin = async (api) => {
     order: 50,
     slots: {
       home_bottom() {
-        const hidden = createMemo(() => api.kv.get("news_hidden", false))
-        return (
-          <box width="100%" maxWidth={75} alignItems="center" paddingTop={2}>
-            <Show when={!hidden()}>
-              <KiloNews />
-            </Show>
-          </box>
-        )
+        return null
       },
     },
   })

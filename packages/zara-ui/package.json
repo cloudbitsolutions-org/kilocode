@@ -1,0 +1,33 @@
+{
+  "name": "@kilocode/zara-ui",
+  "version": "7.4.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 3020",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 3021",
+    "test": "bun test src",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@kilocode/kilo-ui": "workspace:*",
+    "@kilocode/kilo-web-ui": "workspace:*",
+    "@kilocode/sdk": "workspace:*",
+    "@pierre/diffs": "catalog:",
+    "@solidjs/router": "catalog:",
+    "@types/qrcode": "1.5.6",
+    "qrcode": "1.5.4",
+    "solid-js": "catalog:",
+    "yaml": "2.8.3"
+  },
+  "devDependencies": {
+    "@tsconfig/node22": "catalog:",
+    "@types/bun": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plugin-solid": "catalog:"
+  },
+  "peerDependencies": {}
+}

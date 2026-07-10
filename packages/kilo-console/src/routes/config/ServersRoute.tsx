@@ -26,7 +26,7 @@ export function ServersRoute() {
     if (!q) return items()
     const seed: Server = {
       id: q.url,
-      name: "Local Kilo",
+      name: "Local Zara",
       url: q.url,
       dir: q.dir || "Server default",
       status: health?.healthy ? "connected" : "pending",
@@ -38,7 +38,7 @@ export function ServersRoute() {
   function add() {
     const server: Server = {
       id: `${url()}-${Date.now()}`,
-      name: name().trim() || "Kilo Server",
+      name: name().trim() || "Zara Server",
       url: url().trim(),
       dir: "Server default",
       status: "pending",

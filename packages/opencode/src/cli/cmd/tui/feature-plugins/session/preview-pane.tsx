@@ -1,6 +1,7 @@
-import { createResource, Show, createMemo, createSignal, onCleanup, onMount, type Accessor, type JSX } from "solid-js" // kilocode_change
+import { createResource, Show, createMemo, createSignal, onMount, type Accessor, type JSX } from "solid-js"
 import { TextAttributes, type RGBA } from "@opentui/core"
 import { useTerminalDimensions } from "@opentui/solid"
+import { debounce, leadingAndTrailing } from "@solid-primitives/scheduled"
 import type { Message, Part, Session as SdkSession, SnapshotFileDiff } from "@kilocode/sdk/v2"
 import { useTheme } from "@tui/context/theme"
 import { useSDK } from "@tui/context/sdk"
@@ -76,26 +77,7 @@ export function prefetchPreviews(sdk: Sdk, sync: Sync, sessionIDs: readonly stri
 export function createLeadingTrailingSignal<T>(initial: T, ms: number): [Accessor<T>, (v: T) => void, (v: T) => void] {
   const [get, set] = createSignal(initial)
   const setNow = (v: T) => set(() => v)
-  // kilocode_change start - Kilo preview equivalent of anomalyco/opencode#31748
-  let timer: ReturnType<typeof setTimeout> | undefined
-  let queued = false
-  let value = initial
-  const schedule = (next: T) => {
-    value = next
-    if (!timer) setNow(next)
-    else queued = true
-    if (timer) clearTimeout(timer)
-    timer = setTimeout(() => {
-      timer = undefined
-      if (!queued) return
-      queued = false
-      setNow(value)
-    }, ms)
-  }
-  onCleanup(() => {
-    if (timer) clearTimeout(timer)
-  })
-  // kilocode_change end
+  const schedule = leadingAndTrailing(debounce, setNow, ms)
   return [get, setNow, schedule]
 }
 
