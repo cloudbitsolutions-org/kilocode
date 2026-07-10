@@ -15,6 +15,9 @@ NEW_SCOPE="@$ORG"
 echo "Building SDK packages..."
 bun turbo run build --filter=@kilocode/sdk --filter=@kilocode/zara-ui --filter=@kilocode/kilo-console
 
+echo "Building CLI binary packages (this may take a minute)..."
+(cd packages/opencode && bun run script/build.ts)
+
 # Temporary `.npmrc` for authentication
 echo "//npm.pkg.github.com/:_authToken=${NPM_TOKEN}" > .npmrc
 echo "@${ORG}:registry=https://npm.pkg.github.com" >> .npmrc
@@ -65,7 +68,13 @@ restore_scope() {
   fi
 }
 
-PACKAGES=("packages/sdk/js" "packages/zara-ui" "packages/kilo-console")
+PACKAGES=(
+  "packages/sdk/js"
+  "packages/zara-ui"
+  "packages/kilo-console"
+  "packages/opencode/dist/@kilocode/cli-linux-arm64"
+  "packages/opencode/dist/@kilocode/cli-linux-x64"
+)
 
 # Rename scopes
 for pkg in "${PACKAGES[@]}"; do

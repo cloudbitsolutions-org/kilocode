@@ -1,0 +1,39 @@
+name: Publish SDK
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/sdk/js/**'
+      - 'packages/zara-ui/**'
+      - 'packages/kilo-console/**'
+      - 'packages/opencode/**'
+      - 'publish-sdk.sh'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Setup Zig for Bubblewrap compilation
+        run: |
+          curl --fail --location --retry 3 \
+            https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz \
+            --output "$RUNNER_TEMP/zig.tar.xz"
+          tar -xJf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/zig-linux-x86_64-0.13.0" >> "$GITHUB_PATH"
+
+      - name: Install Dependencies
+        run: bun install
+
+      - name: Publish SDK
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: ./publish-sdk.sh

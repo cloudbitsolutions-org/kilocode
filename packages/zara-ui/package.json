@@ -1,8 +1,11 @@
 {
   "name": "@kilocode/zara-ui",
-  "version": "7.4.6",
+  "version": "7.4.7",
   "private": false,
   "type": "module",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 3020",
     "build": "vite build",
