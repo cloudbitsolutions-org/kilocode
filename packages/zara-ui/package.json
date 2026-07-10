@@ -11,6 +11,8 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
+    "@kilocode/kilo-i18n": "workspace:*",
+    "@kilocode/kilo-memory": "workspace:*",
     "@kilocode/kilo-ui": "workspace:*",
     "@kilocode/kilo-web-ui": "workspace:*",
     "@kilocode/sdk": "workspace:*",

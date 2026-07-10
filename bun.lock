@@ -725,6 +725,8 @@
       "name": "@kilocode/zara-ui",
       "version": "7.4.1",
       "dependencies": {
+        "@kilocode/kilo-i18n": "workspace:*",
+        "@kilocode/kilo-memory": "workspace:*",
         "@kilocode/kilo-ui": "workspace:*",
         "@kilocode/kilo-web-ui": "workspace:*",
         "@kilocode/sdk": "workspace:*",
