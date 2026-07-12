@@ -91,6 +91,58 @@ done
 for pkg in "${PACKAGES[@]}"; do
   echo "Publishing $pkg..."
   cd "$pkg"
+  
+  echo "Checking if package version exists..."
+  node -e "
+    const fs = require('fs');
+    const pkg = JSON.parse(fs.readFileSync('package.json'));
+    const token = process.env.NPM_TOKEN;
+    const org = '$ORG';
+    const pkgName = pkg.name.replace('@' + org + '/', '');
+    const version = pkg.version;
+    
+    async function run() {
+      const url = \`https://api.github.com/orgs/\${org}/packages/npm/\${pkgName}/versions\`;
+      const res = await fetch(url, {
+        headers: {
+          'Authorization': \`Bearer \${token}\`,
+          'Accept': 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28'
+        }
+      });
+      if (!res.ok) {
+        if (res.status === 404) return;
+        console.error('Failed to fetch versions for ' + pkgName + ': ' + res.status);
+        return;
+      }
+      const versions = await res.json();
+      const match = versions.find(v => v.name === version);
+      if (match) {
+        console.log(\`Found existing version \${version} for \${pkgName} with ID \${match.id}. Deleting...\`);
+        const delRes = await fetch(\`\${url}/\${match.id}\`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': \`Bearer \${token}\`,
+            'Accept': 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28'
+          }
+        });
+        if (delRes.ok || delRes.status === 204) {
+          console.log('Successfully deleted existing version.');
+          // Wait a few seconds to ensure the registry registers the deletion
+          await new Promise(r => setTimeout(r, 3000));
+        } else {
+          console.error('Failed to delete version: ' + delRes.status);
+          const text = await delRes.text();
+          console.error(text);
+        }
+      }
+    }
+    run().catch(err => {
+      console.error(err);
+    });
+  "
+  
   npm publish --registry=https://npm.pkg.github.com
   cd -
 done
