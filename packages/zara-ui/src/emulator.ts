@@ -43,12 +43,33 @@ export function setupEmulator() {
         
         try {
           switch (msg.type) {
+            case "webviewReady": {
+              emitVsCodeMessage({
+                type: "ready",
+                serverInfo: {
+                  port: 4101,
+                  version: "1.0.0",
+                },
+                workspaceDirectory: directory,
+                extensionVersion: "1.0.0",
+                fontSize: 14,
+              })
+              break
+            }
+            case "requestWorkStyle": {
+              emitVsCodeMessage({
+                type: "workStyleLoaded",
+                style: "skipped"
+              })
+              break
+            }
             case "requestAgents": {
               const res = await client.app.agents()
               if (res.data) {
                 emitVsCodeMessage({ 
                   type: "agentsLoaded", 
                   agents: res.data as any,
+                  allAgents: res.data as any,
                   defaultAgent: "code" 
                 })
               }
@@ -59,8 +80,12 @@ export function setupEmulator() {
               if (res.data) {
                 emitVsCodeMessage({
                   type: "providersLoaded",
-                  providers: {} as any, // Mapped in future
-                  connected: [] as any
+                  providers: {} as any, // Needs proper mapping later if needed
+                  connected: [] as any,
+                  defaults: {},
+                  defaultSelection: { providerID: "kilo-auto", modelID: "kilo-auto" } as any,
+                  authMethods: {},
+                  authStates: {}
                 })
               }
               break
@@ -71,13 +96,15 @@ export function setupEmulator() {
                 emitVsCodeMessage({
                   type: "configLoaded",
                   config: res.data.global as any,
-                  features: {}
+                  features: {
+                    indexing: true,
+                    sandboxControls: true
+                  }
                 })
               }
               break
             }
             case "requestSessions": {
-              // Note: the v2 SDK uses experimental.session.list for listing sessions
               const res = await client.experimental.session.list({ archived: false, limit: 50 })
               if (res.data) {
                 emitVsCodeMessage({
@@ -87,8 +114,73 @@ export function setupEmulator() {
               }
               break
             }
+            case "requestNotifications": {
+              emitVsCodeMessage({
+                type: "notificationsLoaded",
+                notifications: [],
+                dismissedIds: []
+              })
+              break
+            }
+            case "requestModelSelectorExpanded": {
+              emitVsCodeMessage({
+                type: "modelSelectorExpandedLoaded",
+                value: true
+              })
+              break
+            }
+            case "requestTimelineSetting": {
+              emitVsCodeMessage({
+                type: "timelineSettingLoaded",
+                visible: false
+              })
+              break
+            }
+            case "requestAutocompleteSettings": {
+              emitVsCodeMessage({
+                type: "autocompleteSettingsLoaded",
+                settings: {
+                  enableAutoTrigger: false,
+                  enableSmartInlineTaskKeybinding: false,
+                  enableChatAutocomplete: false,
+                  provider: null,
+                  model: null,
+                }
+              })
+              break
+            }
+            case "requestKiloEmbeddingModels": {
+              emitVsCodeMessage({
+                type: "kiloEmbeddingModelsLoaded",
+                catalog: {} as any
+              })
+              break
+            }
+            case "requestMcpStatus": {
+              emitVsCodeMessage({ type: "mcpStatusLoaded", status: {} as any })
+              break
+            }
+            case "requestSkills": {
+              emitVsCodeMessage({ type: "skillsLoaded", skills: [] as any })
+              break
+            }
+            case "requestVariants": {
+              emitVsCodeMessage({ type: "variantsLoaded", variants: {} as any })
+              break
+            }
+            case "requestModelSelections": {
+              emitVsCodeMessage({ type: "modelSelectionsLoaded", selections: {} as any })
+              break
+            }
+            case "requestRecents": {
+              emitVsCodeMessage({ type: "recentsLoaded", recents: [] })
+              break
+            }
+            case "requestFavorites": {
+              emitVsCodeMessage({ type: "favoritesLoaded", favorites: [] })
+              break
+            }
             case "sendMessage": {
-              // First, send the initial message via the API
               await (client as any).session.sendMessage({
                 sessionID: msg.sessionID,
                 directory,
