@@ -87,6 +87,8 @@ for pkg in "${PACKAGES[@]}"; do
   replace_scope "$pkg"
 done
 
+ROOT_DIR=$(pwd)
+
 # Publish
 for pkg in "${PACKAGES[@]}"; do
   echo "Publishing $pkg..."
@@ -143,7 +145,7 @@ for pkg in "${PACKAGES[@]}"; do
     });
   "
   
-  npm publish --registry=https://npm.pkg.github.com
+  npm publish --registry=https://npm.pkg.github.com --userconfig "$ROOT_DIR/.npmrc"
   cd -
 done
 
