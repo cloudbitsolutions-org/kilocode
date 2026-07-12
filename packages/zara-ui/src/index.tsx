@@ -17,6 +17,13 @@ import "./console/styles.css"
 const root = document.getElementById("root")
 
 if (root) {
+  // Handle theme override from URL
+  const urlParams = new URLSearchParams(window.location.search)
+  const themeParam = urlParams.get("theme")
+  if (themeParam === "dark" || themeParam === "light") {
+    localStorage.setItem("opencode-color-scheme", themeParam)
+  }
+
   // Initialize the VS Code Extension Host API Emulator
   setupEmulator()
 
