@@ -21,8 +21,8 @@ echo "Building CLI binary packages (this may take a minute)..."
 (cd packages/opencode && bun run script/build.ts)
 
 # Temporary `.npmrc` for authentication
-echo "//npm.pkg.github.com/:_authToken=${NPM_TOKEN}" > ~/.npmrc
-echo "@${ORG}:registry=https://npm.pkg.github.com" >> ~/.npmrc
+echo "//npm.pkg.github.com/:_authToken=${NPM_TOKEN}" > .npmrc
+echo "@${ORG}:registry=https://npm.pkg.github.com" >> .npmrc
 
 echo "Dynamically rewriting scope from $OLD_SCOPE to $NEW_SCOPE..."
 
@@ -101,6 +101,6 @@ for pkg in "${PACKAGES[@]}"; do
 done
 
 # Clean up .npmrc
-rm ~/.npmrc
+git checkout -- .npmrc
 
 echo "Successfully published to GitHub Packages!"
