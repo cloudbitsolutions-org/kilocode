@@ -722,6 +722,12 @@ export async function completeProvider(input: Query, id: string, method: number,
   await sdk.global.dispose()
 }
 
+export async function removeProviderAuth(input: Query, id: string) {
+  const sdk = client(input)
+  const result = await sdk.auth.remove({ providerID: id })
+  return demand("Remove provider authentication", result)
+}
+
 export async function connectMcp(input: Query, name: string) {
   const sdk = client(input)
   const result = await sdk.mcp.connect({ name })

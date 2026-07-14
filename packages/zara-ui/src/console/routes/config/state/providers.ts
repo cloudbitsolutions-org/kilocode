@@ -2,7 +2,7 @@ import { createMemo, createSignal } from "solid-js"
 import type { Provider, ProviderAuthAuthorization, ProviderAuthMethod, ProviderConfig } from "@kilocode/sdk/v2/client"
 import { useConfig } from "../../../context/config"
 import { clean, csv, errMsg } from "../../../shared/utils"
-import { authorizeProvider, completeProvider, connectProvider } from "../../../client"
+import { authorizeProvider, completeProvider, connectProvider, removeProviderAuth } from "../../../client"
 
 const priority = ["kilo", "anthropic", "github-copilot", "openai", "google", "openrouter", "vercel"]
 const pattern = /^[a-z0-9][a-z0-9-_]*$/
@@ -151,7 +151,7 @@ export function useProviderSettings() {
     if (!data) return []
     const ids = new Set(configured().map((item) => item.id))
     const term = filter().trim().toLowerCase()
-    
+
     const allProviders = sort(data.providers.all)
       .filter((provider) => !ids.has(provider.id))
       .filter((provider) => {
@@ -322,9 +322,10 @@ export function useProviderSettings() {
       return
     }
     setPhase("connecting")
-    ctx.run("Connecting provider", async () =>
-      completeProvider(ctx.target(), id(), index, authorization()?.method === "code" ? code : undefined),
-    )
+    ctx.run("Connecting provider", async () => {
+      await completeProvider(ctx.target(), id(), index, authorization()?.method === "code" ? code : undefined)
+      if (authorization()?.method === "auto") close()
+    })
     if (authorization()?.method === "code") close()
   }
 
@@ -382,9 +383,14 @@ export function useProviderSettings() {
   function confirm() {
     const item = pending()
     if (!item) return
-    const data = snap()
-    if (!data) return
-    ctx.save({ provider: { ...(data.effective.provider ?? {}), [item.id]: null } })
+    ctx.run("Removing provider", async () => {
+      try {
+        await removeProviderAuth(ctx.target(), item.id)
+      } catch (err) {
+        console.warn("Failed to remove provider auth:", err)
+      }
+      ctx.unset([["provider", item.id]])
+    })
     setPending(undefined)
   }
 
