@@ -94,6 +94,7 @@ let cli = yargs(args) // kilocode_change
       print: process.argv.includes("--print-logs"),
       dev: Installation.isLocal(),
       level: (() => {
+        if (process.env.LOG_LEVEL) return process.env.LOG_LEVEL as Log.Level
         if (opts.logLevel) return opts.logLevel as Log.Level
         if (Installation.isLocal()) return "DEBUG"
         return "INFO"
