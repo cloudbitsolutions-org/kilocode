@@ -618,7 +618,18 @@ export async function loadProjectDiffFile(input: Query, dir: string, file: strin
 
 export async function createProjectPty(input: Query, dir: string, title = "Zara session"): Promise<ProjectPtyInfo> {
   const sdk = client({ url: input.url, dir })
-  const result = await sdk.pty.create({ directory: dir, command: "kilo", cwd: dir, title })
+  const result = await sdk.pty.create({
+    directory: dir,
+    command: "kilo",
+    cwd: dir,
+    title,
+    env: {
+      // Web console PTYs should stay isolated instead of auto-attaching to any
+      // daemon already running on the host, which can make concurrent VM-backed
+      // terminals interfere with each other.
+      KILO_NO_DAEMON: "1",
+    },
+  })
   return demand("Create terminal", result)
 }
 
