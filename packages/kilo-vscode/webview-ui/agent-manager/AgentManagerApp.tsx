@@ -94,7 +94,15 @@ import { LanguageBridge } from "../src/context/language-bridge"
 import { useLanguage } from "../src/context/language"
 import { formatRelativeDate } from "../src/utils/date"
 import { createTabFocus } from "../src/utils/tab-navigation"
-import { nextSelectionAfterDelete, adjacentHint, filterUnassignedSessions, LOCAL } from "./navigate"
+import {
+  canOpenRootSession,
+  isKnownRootSession,
+  nextSelectionAfterDelete,
+  adjacentHint,
+  filterUnassignedSessions,
+  focusChatSearch,
+  LOCAL,
+} from "./navigate"
 import {
   addPendingTab as addLocalPendingTab,
   nextTabAfterClose,
@@ -102,6 +110,7 @@ import {
   reconcileTrackedTabs,
   replacePendingTab,
   restoreTrackedTabs,
+  trackedSessionInventory,
 } from "../src/utils/local-tabs"
 import {
   deletePendingDraft,
@@ -245,10 +254,6 @@ const AgentManagerContent: Component = () => {
   /** Remove a session ID from the local tab (no-op if absent). */
   const evictLocal = (sid: string) =>
     setLocalSessionIDs((prev) => (prev.includes(sid) ? prev.filter((id) => id !== sid) : prev))
-  const inventory = (items: ManagedSessionState[]) => ({
-    local: items.filter((item) => !item.worktreeId).map((item) => item.id),
-    external: new Set(items.filter((item) => item.worktreeId).map((item) => item.id)),
-  })
   const [sidebarWidth, setSidebarWidth] = createSignal(persisted?.sidebarWidth ?? DEFAULT_SIDEBAR_WIDTH)
   const [sessionsCollapsed, setSessionsCollapsed] = createSignal(true)
   const sidebar = createSidebarCollapse(vscode)
@@ -295,8 +300,8 @@ const AgentManagerContent: Component = () => {
   const [applySelectedFiles, setApplySelectedFiles] = createSignal<string[]>([])
   const [applySelectionTouched, setApplySelectionTouched] = createSignal(false)
 
-  // Pending local tab counter for generating unique IDs
   const PENDING_PREFIX = "pending:"
+  const closedDrafts = new Set<string>()
   const [activePendingId, setActivePendingId] = createSignal<string | undefined>()
 
   // Per-sidebar-context terminal state. `terms.activeId` holds the id
@@ -615,8 +620,7 @@ const AgentManagerContent: Component = () => {
     const next = addLocalPendingTab({ ids: localSessionIDs(), active: activePendingId() }, id)
     setLocalSessionIDs(next.ids)
     appendToTabOrder(LOCAL, id)
-    // Deactivate any focused terminal so the new pending session is
-    // actually visible — visibleTabId prioritises terms.activeId().
+    // Deactivate any focused terminal so the new pending session is visible.
     terms.setActiveId(undefined)
     setActivePendingId(id)
     session.clearCurrentSession()
@@ -666,8 +670,8 @@ const AgentManagerContent: Component = () => {
     if (all.length === 0) return // sessions not loaded yet
     const next = reconcileTrackedTabs(
       localSessionIDs(),
-      all.map((s) => s.id),
-      inventory(managedSessions()),
+      all.filter(isKnownRootSession).map((s) => s.id),
+      trackedSessionInventory(managedSessions(), all),
       isPending,
     )
     if (!next) return
@@ -722,7 +726,7 @@ const AgentManagerContent: Component = () => {
     const now = new Date().toISOString()
     for (const id of ids) {
       const real = lookup.get(id)
-      if (real) {
+      if (real && isKnownRootSession(real)) {
         result.push(real)
       } else if (isPending(id)) {
         result.push({ id, title: t("agentManager.session.newSession"), createdAt: now, updatedAt: now })
@@ -741,7 +745,7 @@ const AgentManagerContent: Component = () => {
     return applyTabOrder(
       session
         .sessions()
-        .filter((s) => ids.has(s.id))
+        .filter((s) => isKnownRootSession(s) && ids.has(s.id))
         .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
       worktreeTabOrder()[worktreeId],
     )
@@ -990,14 +994,9 @@ const AgentManagerContent: Component = () => {
     const remembered = tabMemory()[worktreeId]
     if (terms.hasRemembered(worktreeId, remembered)) return termHandlers.activate(remembered!)
     terms.setActiveId(undefined)
-    // Try rich session list first, fall back to managed session IDs when
-    // session.sessions() hasn't been populated yet for this worktree.
     const rich = sessionsForWorktree(worktreeId)
-    const managed = managedSessions().filter((ms) => ms.worktreeId === worktreeId)
-    const target = remembered
-      ? (rich.find((s) => s.id === remembered) ?? managed.find((ms) => ms.id === remembered))
-      : undefined
-    const fallback = target ?? rich[0] ?? managed[0]
+    const target = remembered ? rich.find((s) => s.id === remembered) : undefined
+    const fallback = target ?? rich[0]
     if (fallback) session.selectSession(fallback.id)
     else session.setCurrentSessionID(undefined)
     setReviewActive(remembered === REVIEW_TAB_ID && reviewOpenByContext()[worktreeId] === true)
@@ -1005,7 +1004,7 @@ const AgentManagerContent: Component = () => {
 
   const addSessionToCurrentWorktree = (sid: string) => {
     const sel = selection()
-    if (!sel || sel === LOCAL) return false
+    if (!sel || sel === LOCAL || !canOpenRootSession(sid, session.sessions())) return false
     const current = managedSessions().find((entry) => entry.id === sid)
     if (current?.worktreeId) return focusManagedSession(current.worktreeId, sid)
     saveTabMemory()
@@ -1109,6 +1108,8 @@ const AgentManagerContent: Component = () => {
       else if (msg.action === "closeWorktree") closeSelectedWorktree()
       else if (msg.action === "showShortcuts") handleShowKeyboardShortcuts()
       else if (msg.action === "focusInput") window.dispatchEvent(new Event("focusPrompt"))
+      else if (msg.action === "focusSearch")
+        focusChatSearch({ history: setHistory, review: setReviewActive, terminal: () => terms.setActiveId(undefined) })
       else if (msg.action === "newTerminal") termHandlers.requestNew()
       else if (msg.action === "cycleAgentMode" && document.hasFocus()) cycleAgent(1)
       else if (msg.action === "cyclePreviousAgentMode" && document.hasFocus()) cycleAgent(-1)
@@ -1190,8 +1191,10 @@ const AgentManagerContent: Component = () => {
     const unsubCreate = vscode.onMessage((msg) => {
       if (msg.type !== "sessionCreated") return
       const created = msg as SessionCreatedMessage
+      if (!isKnownRootSession(created.session)) return
       if (!created.draftID && createdSessions.delete(created.session.id)) return
       if (created.draftID) createdSessions.add(created.session.id)
+      if (created.draftID && closedDrafts.delete(created.draftID)) return
       if (created.draftID && promotePendingDraftDiscard(created.draftID, created.session.id)) return
       const pending = created.draftID && localSessionIDs().includes(created.draftID) ? created.draftID : undefined
       if (!pending && localSessionIDs().includes(created.session.id)) return
@@ -1201,7 +1204,11 @@ const AgentManagerContent: Component = () => {
       if (!pending) saveTabMemory()
       placeLocal(created.session.id, pending, active)
       if (!pending) setSelection(LOCAL)
-      vscode.postMessage({ type: "agentManager.persistSession", sessionId: created.session.id })
+      vscode.postMessage({
+        type: "agentManager.persistSession",
+        sessionId: created.session.id,
+        draftID: created.draftID,
+      })
       if (focus) session.selectSession(created.session.id)
     })
 
@@ -1341,7 +1348,7 @@ const AgentManagerContent: Component = () => {
         }
         // Restore local session IDs from persisted state (sessions with no worktreeId)
         const restored = restoreTrackedTabs(
-          inventory(state.sessions),
+          trackedSessionInventory(state.sessions, session.sessions()),
           localSessionIDs(),
           state.tabOrder?.[LOCAL],
           isPending,
@@ -1935,6 +1942,7 @@ const AgentManagerContent: Component = () => {
   }
 
   const openLocally = (sid: string) => {
+    if (!canOpenRootSession(sid, session.sessions())) return
     saveTabMemory()
     expandSidebar()
     const pending = activePendingId()
@@ -1985,14 +1993,13 @@ const AgentManagerContent: Component = () => {
     }
     if (pending || localSet().has(sessionId)) {
       setLocalSessionIDs((prev) => prev.filter((id) => id !== sessionId))
-      if (!pending) vscode.postMessage({ type: "agentManager.forgetSession", sessionId })
-    } else {
-      vscode.postMessage({ type: "agentManager.closeSession", sessionId })
     }
     if (pending) {
+      closedDrafts.add(sessionId)
       if (session.isSubmitting(sessionId) || isPendingSend(sessionId)) discardPendingDraft(sessionId)
       queueMicrotask(() => deletePendingDraft(sessionId))
     }
+    vscode.postMessage({ type: "agentManager.closeSession", sessionId })
     tabFocus.restore()
   }
 

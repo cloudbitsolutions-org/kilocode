@@ -7,8 +7,6 @@
  * Returns the action to take: select a session by ID, go to local, or do nothing.
  */
 
-import { isRootSession } from "../src/context/session-utils"
-
 /** Sentinel value for the local repo selection. */
 export const LOCAL = "local" as const
 
@@ -16,13 +14,22 @@ type NavResult = { action: "select"; id: string } | { action: typeof LOCAL } | {
 
 type SessionLike = { id: string; parentID?: string | null; createdAt: string }
 
+export function isKnownRootSession(session: Pick<SessionLike, "parentID">): boolean {
+  return session.parentID === null
+}
+
+export function canOpenRootSession(id: string, sessions: Pick<SessionLike, "id" | "parentID">[]): boolean {
+  const session = sessions.find((item) => item.id === id)
+  return !!session && isKnownRootSession(session)
+}
+
 export function filterUnassignedSessions<T extends SessionLike>(
   sessions: T[],
   worktree: Set<string>,
   local: Set<string>,
 ): T[] {
   return [...sessions]
-    .filter((s) => isRootSession(s) && !worktree.has(s.id) && !local.has(s.id))
+    .filter((s) => isKnownRootSession(s) && !worktree.has(s.id) && !local.has(s.id))
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 }
 
@@ -112,4 +119,16 @@ export function nextSelectionAfterDelete(deletedId: string, worktreeIds: string[
   if (remaining.length === 0) return LOCAL
   // Prefer the item that was below (same index in the shortened list), else the one above
   return remaining[Math.min(idx, remaining.length - 1)]!
+}
+
+/**
+ * A "focus chat search" request only reaches TaskHeader while ChatView is
+ * the visible main surface — history, an active terminal tab, and the
+ * full-screen review each replace it. Reset to chat first, then dispatch.
+ */
+export function focusChatSearch(reset: { history(v: boolean): void; review(v: boolean): void; terminal(): void }) {
+  reset.history(false)
+  reset.review(false)
+  reset.terminal()
+  window.dispatchEvent(new CustomEvent("focusTranscriptSearch"))
 }
