@@ -37,10 +37,24 @@ const getClipboardy = lazy(async () => {
 function writeOsc52(text: string): void {
   if (!process.stdout.isTTY) return
   const base64 = Buffer.from(text).toString("base64")
-  const osc52 = `\x1b]52;c;${base64}\x07`
   const passthrough = process.env["TMUX"] || process.env["STY"]
-  const sequence = passthrough ? `\x1bPtmux;\x1b${osc52}\x1b\\` : osc52
-  process.stdout.write(sequence)
+  
+  if (passthrough) {
+    // tmux requires chunking the DCS sequence payload, and escaping \x1b
+    const osc52 = `\x1b]52;c;${base64}\x07`.replace(/\x1b/g, "\x1b\x1b")
+    const chunkSize = 256
+    for (let i = 0; i < osc52.length; i += chunkSize) {
+      const chunk = osc52.slice(i, i + chunkSize)
+      process.stdout.write(`\x1bPtmux;${chunk}\x1b\\`)
+    }
+  } else {
+    // Write in chunks to prevent overflowing OS pipe buffers over SSH/PTY
+    const osc52 = `\x1b]52;c;${base64}\x07`
+    const chunkSize = 65536
+    for (let i = 0; i < osc52.length; i += chunkSize) {
+      process.stdout.write(osc52.slice(i, i + chunkSize))
+    }
+  }
 }
 
 export interface Content {
@@ -126,11 +140,17 @@ const getCopyMethod = lazy(async () => {
   const os = platform()
   const which = await getWhich()
 
-  if (os === "darwin" && which("osascript")) {
-    console.log("clipboard: using osascript")
-    return async (text: string) => {
-      const escaped = text.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
-      await Process.run(["osascript", "-e", `set the clipboard to "${escaped}"`], { nothrow: true })
+  if (os === "darwin") {
+    if (which("pbcopy")) {
+      console.log("clipboard: using pbcopy")
+      return (text: string) => writeWithStdin(["pbcopy"], text)
+    }
+    if (which("osascript")) {
+      console.log("clipboard: using osascript")
+      return async (text: string) => {
+        const escaped = text.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
+        await Process.run(["osascript", "-e", `set the clipboard to "${escaped}"`], { nothrow: true })
+      }
     }
   }
 
