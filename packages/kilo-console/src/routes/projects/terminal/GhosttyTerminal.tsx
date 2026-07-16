@@ -238,6 +238,55 @@ function patch(renderer: Terminal["renderer"]) {
   }
 }
 
+class Osc52Parser {
+  private buffer = ""
+  private decoder = new TextDecoder()
+
+  push(data: string | Uint8Array) {
+    const text = typeof data === "string" ? data : this.decoder.decode(data, { stream: true })
+    this.buffer += text
+    
+    let startIdx = this.buffer.indexOf("\x1b]52;c;")
+    while (startIdx !== -1) {
+      let endIdx = this.buffer.indexOf("\x07", startIdx)
+      let isST = false
+      const stIdx = this.buffer.indexOf("\x1b\\", startIdx)
+      
+      if (endIdx === -1 || (stIdx !== -1 && stIdx < endIdx)) {
+        endIdx = stIdx
+        isST = true
+      }
+
+      if (endIdx !== -1) {
+        const base64 = this.buffer.substring(startIdx + 8, endIdx)
+        try {
+          const decodedStr = atob(base64)
+          const bytes = new Uint8Array(decodedStr.length)
+          for (let i = 0; i < decodedStr.length; i++) {
+             bytes[i] = decodedStr.charCodeAt(i)
+          }
+          const finalStr = new TextDecoder().decode(bytes)
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(finalStr).catch(e => console.warn("Clipboard write failed", e))
+          }
+        } catch (e) {
+          console.error("Failed to parse OSC 52", e)
+        }
+        
+        this.buffer = this.buffer.substring(endIdx + (isST ? 2 : 1))
+        startIdx = this.buffer.indexOf("\x1b]52;c;")
+      } else {
+        this.buffer = this.buffer.substring(startIdx)
+        break
+      }
+    }
+    
+    if (startIdx === -1 && this.buffer.length > 100) {
+      this.buffer = this.buffer.substring(this.buffer.length - 100)
+    }
+  }
+}
+
 export function GhosttyTerminal(props: { query: Query; pty: string; active?: boolean; onExit?: () => void }) {
   let host!: HTMLDivElement
   let term: Terminal | undefined
@@ -314,6 +363,8 @@ export function GhosttyTerminal(props: { query: Query; pty: string; active?: boo
         ws = new WebSocket(ptyWsUrl(props.query, props.pty))
         ws.binaryType = "arraybuffer"
         
+        const osc52Parser = new Osc52Parser()
+
         ws.onopen = () => {
           reconnectAttempts = 0
           setFailure(undefined)
@@ -322,12 +373,14 @@ export function GhosttyTerminal(props: { query: Query; pty: string; active?: boo
         ws.onmessage = (event) => {
           if (disposed || !term) return
           if (typeof event.data === "string") {
+            osc52Parser.push(event.data)
             term.write(event.data)
             return
           }
           if (event.data instanceof ArrayBuffer) {
             const bytes = new Uint8Array(event.data)
             if (done(bytes)) return
+            osc52Parser.push(bytes)
             term.write(bytes)
             return
           }
@@ -336,6 +389,7 @@ export function GhosttyTerminal(props: { query: Query; pty: string; active?: boo
               if (disposed || !term) return
               const bytes = new Uint8Array(buffer)
               if (done(bytes)) return
+              osc52Parser.push(bytes)
               term.write(bytes)
             })
           }
