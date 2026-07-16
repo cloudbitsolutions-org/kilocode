@@ -10,6 +10,7 @@ import { ConfigLayout } from "./console/layouts/ConfigLayout"
 import { configSections } from "./console/routes/config/sections"
 import { setupEmulator } from "./emulator"
 
+// @ts-expect-error missing types for styles
 import "@kilocode/kilo-ui/styles"
 import "@kilocode/kilo-web-ui/styles"
 import "./console/styles.css"

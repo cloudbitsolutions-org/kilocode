@@ -641,7 +641,7 @@ export async function removeProjectPty(input: Query, pty: string) {
 
 export async function viewProjectSessions(input: ProjectQuery, focused: string[], open: string[]) {
   const sdk = client(input)
-  const result = await sdk.session.viewed({ directory: input.dir, focused, open })
+  const result = await sdk.session.viewed({ directory: input.dir, visible: focused, attached: open } as any)
   return demand("Viewed sessions", result)
 }
 

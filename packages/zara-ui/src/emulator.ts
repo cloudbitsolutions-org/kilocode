@@ -697,7 +697,7 @@ async function handlePermissionResponse(msg: any) {
     await client.permission.respond({
       sessionID: msg.sessionID,
       directory,
-      id: msg.permissionId,
+      permissionID: msg.permissionId,
       response: msg.response,
     })
   } catch (e) {

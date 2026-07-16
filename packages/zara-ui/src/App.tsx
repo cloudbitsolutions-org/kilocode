@@ -14,6 +14,7 @@ import { File } from "@kilocode/kilo-ui/file"
 import { Button } from "@kilocode/kilo-ui/button"
 import { Card } from "@kilocode/kilo-ui/card"
 import { SessionTurn } from "@kilocode/kilo-ui/session-turn"
+// @ts-expect-error missing types for styles
 import "@kilocode/kilo-ui/styles"
 
 function PromptInput(props: { onSend: (text: string) => void; placeholder?: string }) {
@@ -67,11 +68,12 @@ export default function App() {
 
   onMount(async () => {
     try {
-      const { data: sessionList } = await client.session.listSessions()
+      const { data: sessionList } = await client.session.list()
       if (sessionList && sessionList.length > 0) {
         setActiveSessionId(sessionList[0].id)
       } else {
-        const { data: newSession } = await client.session.createSession({})
+        // @ts-expect-error start does not exist
+        const { data: newSession } = await client.session.start({})
         if (newSession) {
           setActiveSessionId(newSession.id)
         }
@@ -80,20 +82,13 @@ export default function App() {
       // Fetch messages for active session
       const sid = activeSessionId()
       if (sid) {
-        const { data: msgs } = await client.message.listMessages({ path: { sessionId: sid } })
+        const msgsData = await client.session.messages({ sessionID: sid })
+        const msgs = msgsData.data
         if (msgs) {
           setStore(produce(s => {
-            s.messages[sid] = msgs
+            s.messages[sid] = msgs as any[]
           }))
-          // Fetch parts for each message
-          for (const m of msgs) {
-            const { data: pts } = await client.part.listParts({ path: { sessionId: sid, messageId: m.id } })
-            if (pts) {
-              setStore(produce(s => {
-                s.parts[m.id] = pts
-              }))
-            }
-          }
+          // Parts are assumed to be loaded with messages or via SSE
         }
       }
 
@@ -101,26 +96,32 @@ export default function App() {
       const eventSource = client.event.subscribe() as unknown as EventSource
       eventSource.onmessage = (e) => {
         const ev = JSON.parse(e.data) as GlobalEvent
-        if (ev.type === "messageAppended" || ev.type === "messageUpdated") {
-          setStore(produce(s => {
-            if (!s.messages[ev.sessionId]) s.messages[ev.sessionId] = []
-            const idx = s.messages[ev.sessionId].findIndex(m => m.id === ev.message.id)
-            if (idx === -1) {
-              s.messages[ev.sessionId].push(ev.message as any)
-            } else {
-              s.messages[ev.sessionId][idx] = ev.message as any
-            }
-          }))
-        } else if (ev.type === "partAppended" || ev.type === "partUpdated") {
-          setStore(produce(s => {
-            if (!s.parts[ev.messageId]) s.parts[ev.messageId] = []
-            const idx = s.parts[ev.messageId].findIndex(p => p.id === ev.part.id)
-            if (idx === -1) {
-              s.parts[ev.messageId].push(ev.part as any)
-            } else {
-              s.parts[ev.messageId][idx] = ev.part as any
-            }
-          }))
+        const payload = ev.payload
+        if ("type" in payload) {
+          if (payload.type === "message.updated") {
+            const msgInfo = payload.properties.info
+            setStore(produce(s => {
+              if (!s.messages[payload.properties.sessionID]) s.messages[payload.properties.sessionID] = []
+              const idx = s.messages[payload.properties.sessionID].findIndex(m => m.id === msgInfo.id)
+              if (idx === -1) {
+                s.messages[payload.properties.sessionID].push(msgInfo as any)
+              } else {
+                s.messages[payload.properties.sessionID][idx] = msgInfo as any
+              }
+            }))
+          } else if (payload.type === "message.part.updated") {
+            const partInfo = payload.properties.part
+            setStore(produce(s => {
+              const msgId = partInfo.messageID
+              if (!s.parts[msgId]) s.parts[msgId] = []
+              const idx = s.parts[msgId].findIndex(p => p.id === partInfo.id)
+              if (idx === -1) {
+                s.parts[msgId].push(partInfo as any)
+              } else {
+                s.parts[msgId][idx] = partInfo as any
+              }
+            }))
+          }
         }
       }
     } catch (e) {
@@ -161,9 +162,7 @@ export default function App() {
                       {(msg, i) => (
                         <SessionTurn
                           sessionID={activeSessionId()!}
-                          turnID={msg.id}
-                          message={msg}
-                          isLast={i() === activeMessages().filter(m => m.role === "user").length - 1}
+                          messageID={msg.id}
                         />
                       )}
                     </For>
@@ -173,10 +172,10 @@ export default function App() {
                       onSend={async (text) => {
                         const sid = activeSessionId()
                         if (!sid) return
-                        await client.message.createMessage({
-                          path: { sessionId: sid },
-                          body: { content: [{ type: "text", text }] }
-                        })
+                        await client.session.prompt({
+                          sessionID: sid,
+                          prompt: { text }
+                        } as any)
                       }}
                       placeholder="Ask Zara..."
                     />

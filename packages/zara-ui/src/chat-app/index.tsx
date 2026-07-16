@@ -1,4 +1,5 @@
 /* @refresh reload */
+// @ts-expect-error missing types for styles
 import "@kilocode/kilo-ui/styles"
 import { render } from "solid-js/web"
 import App from "./App"
