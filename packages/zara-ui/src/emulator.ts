@@ -71,6 +71,7 @@ function indexProvidersById(all: any[]): Record<string, any> {
 const { client, directory } = getClient()
 let currentSessionID: string | null = null
 let selectedAgent: string | undefined = undefined
+let autoApproveEnabled = false
 
 // ─── SSE Event Stream ───────────────────────────────────────────────────────
 
@@ -84,9 +85,11 @@ function mapSSEEvent(event: any): ExtensionMessage | null {
 
   // ── Sync events (message/session CRUD) ──
   if (event.type === "sync") {
-    switch (event.name) {
+    const syncName = event.syncEvent?.type || event.syncEvent?.name || event.name
+    const syncData = event.syncEvent?.data || event.data
+    switch (syncName) {
       case "message.updated.1": {
-        const info = event.data.info
+        const info = syncData.info
         return {
           type: "messageCreated",
           message: {
@@ -100,14 +103,14 @@ function mapSSEEvent(event: any): ExtensionMessage | null {
       case "message.removed.1":
         return {
           type: "messageRemoved",
-          sessionID: event.data.sessionID,
-          messageID: event.data.messageID,
+          sessionID: syncData.sessionID,
+          messageID: syncData.messageID,
         } as any
       case "message.part.updated.1": {
-        const part = event.data.part
+        const part = syncData.part
         return {
           type: "partUpdated",
-          sessionID: event.data.sessionID,
+          sessionID: syncData.sessionID,
           messageID: part.messageID,
           part,
         } as any
@@ -115,21 +118,21 @@ function mapSSEEvent(event: any): ExtensionMessage | null {
       case "message.part.removed.1":
         return {
           type: "partRemoved",
-          sessionID: event.data.sessionID,
-          messageID: event.data.messageID,
-          partID: event.data.partID,
+          sessionID: syncData.sessionID,
+          messageID: syncData.messageID,
+          partID: syncData.partID,
         } as any
       case "session.created.1":
         return {
           type: "sessionCreated",
-          session: sessionToWebview(event.data.info),
+          session: sessionToWebview(syncData.info),
         } as any
       case "session.updated.1":
         return null // handled separately
       case "session.deleted.1":
         return {
           type: "sessionDeleted",
-          sessionID: event.data.sessionID,
+          sessionID: syncData.sessionID,
         } as any
     }
     return null
@@ -146,7 +149,7 @@ function mapSSEEvent(event: any): ExtensionMessage | null {
         messageID: props.messageID,
         part: {
           id: props.partID,
-          type: "text",
+          type: props.partType || "text",
           messageID: props.messageID,
           text: props.delta,
         },
@@ -165,6 +168,28 @@ function mapSSEEvent(event: any): ExtensionMessage | null {
             ? new Date(info.time.created).toISOString()
             : new Date().toISOString(),
         },
+      } as any
+    }
+
+    case "message.part.updated": {
+      const props = event.properties
+      if (!props) return null
+      return {
+        type: "partUpdated",
+        sessionID: props.sessionID,
+        messageID: props.part?.messageID,
+        part: props.part,
+      } as any
+    }
+
+    case "message.part.removed": {
+      const props = event.properties
+      if (!props) return null
+      return {
+        type: "partRemoved",
+        sessionID: props.sessionID,
+        messageID: props.messageID,
+        partID: props.partID,
       } as any
     }
 
@@ -338,8 +363,20 @@ function setupEventStream() {
       for await (const event of events.stream) {
         if (ctl.signal.aborted) return
         const payload = event.payload ?? event
+        if ((payload.type as string) !== "server.heartbeat") {
+          console.log("[Emulator SSE Raw Payload]", payload)
+        }
         const msg = mapSSEEvent(payload)
         if (msg) {
+          console.log("[Emulator SSE Mapped Msg]", msg)
+          if (msg.type === "permissionRequest" && autoApproveEnabled) {
+            void client.permission.respond({
+              sessionID: (msg as any).permission.sessionID,
+              directory,
+              permissionID: (msg as any).permission.id,
+              response: "once",
+            }).catch(e => console.error("[Emulator] Auto-approve failed:", e))
+          }
           emitVsCodeMessage(msg)
         }
       }
@@ -489,9 +526,9 @@ async function handleRequestSessions() {
 }
 
 async function handleSendMessage(msg: any) {
-  try {
-    let sessionID = msg.sessionID || currentSessionID
+  let sessionID = msg.sessionID || currentSessionID
 
+  try {
     // Create a new session if none exists
     if (!sessionID) {
       const { data: session } = await client.session.create(
@@ -550,14 +587,36 @@ async function handleSendMessage(msg: any) {
   } catch (e) {
     console.error("[Emulator] Failed to send message:", e)
     emitVsCodeMessage({
-      type: "sendMessageFailed",
-      error:
-        e instanceof Error ? e.message : "Failed to send message",
-      text: msg.text,
-      sessionID: msg.sessionID || currentSessionID,
-      draftID: msg.draftID,
-      messageID: msg.messageID,
-      files: msg.files,
+      type: "messageCreated",
+      sessionID,
+      message: {
+        id: "error-" + Date.now(),
+        time: { created: new Date().toISOString(), updated: new Date().toISOString() },
+        role: "assistant",
+        parts: [{ type: "text", text: `[Emulator Error] Request failed: ${e}` }],
+        createdAt: new Date().toISOString(),
+      },
+    } as any)
+  }
+}
+
+async function handleEnhancePrompt(msg: any) {
+  try {
+    const { data } = await client.enhancePrompt.enhance(
+      { text: msg.text },
+      { throwOnError: true }
+    )
+    emitVsCodeMessage({
+      type: "enhancePromptResult",
+      text: data.text,
+      requestId: msg.requestId,
+    } as any)
+  } catch (e: any) {
+    console.error("[Emulator] Failed to enhance prompt:", e)
+    emitVsCodeMessage({
+      type: "enhancePromptError",
+      error: e.message || "Failed to enhance prompt",
+      requestId: msg.requestId,
     } as any)
   }
 }
@@ -620,7 +679,16 @@ async function handleAbort(msg: any) {
 
 async function handleLoadMessages(msg: any) {
   const sessionID = msg.sessionID
-  if (!sessionID) return
+  if (!sessionID || sessionID === "{sessionID}") {
+    emitVsCodeMessage({
+      type: "messagesLoaded",
+      sessionID,
+      messages: [],
+      mode: msg.mode ?? "replace",
+      hasMore: false,
+    } as any)
+    return
+  }
   try {
     const { data: items, response } = await client.session.messages(
       {
@@ -956,13 +1024,6 @@ export function setupEmulator() {
               })
               break
 
-            case "requestMcpStatus":
-              emitVsCodeMessage({
-                type: "mcpStatusLoaded",
-                status: {} as any,
-              })
-              break
-
             case "requestSkills":
               emitVsCodeMessage({
                 type: "skillsLoaded",
@@ -1137,6 +1198,51 @@ export function setupEmulator() {
               }
               break
 
+            case "requestSandboxDefault":
+              try {
+                const { data: status } = await client.sandbox.support({ directory }, { throwOnError: true })
+                emitVsCodeMessage({
+                  type: "sandboxDefaultStatus",
+                  desired: true,
+                  enabled: status.available,
+                  available: status.available,
+                  reason: status.reason,
+                } as any)
+              } catch (e) {
+                console.error("[Emulator] Failed to request sandbox default status:", e)
+              }
+              break
+
+            case "setSandboxDefault":
+              emitVsCodeMessage({
+                type: "sandboxDefaultStatus",
+                desired: msg.enabled,
+                enabled: msg.enabled,
+                available: true,
+                reason: undefined,
+                revision: 1,
+                requestID: msg.requestID,
+              })
+              break
+
+            case "toggleSandbox":
+              try {
+                const sid = msg.sessionID || currentSessionID
+                if (sid && sid !== "{sessionID}") {
+                  const { data } = await client.sandbox.toggle({ sessionID: sid, directory }, { throwOnError: true })
+                  emitVsCodeMessage({
+                    type: "sandboxStatus",
+                    sessionID: sid,
+                    revision: 1,
+                    ...data,
+                    requestID: msg.requestID
+                  } as any)
+                }
+              } catch (e) {
+                console.error("[Emulator] Failed to toggle sandbox:", e)
+              }
+              break
+
             case "requestImageModels":
               emitVsCodeMessage({ type: "imageModelsLoaded", models: [] } as any)
               break
@@ -1152,18 +1258,23 @@ export function setupEmulator() {
 
             case "requestSandboxStatus":
               try {
-                const { data: status } = await client.sandbox.status({ directory }, { throwOnError: true })
-                emitVsCodeMessage({ type: "sandboxStatusLoaded", status } as any)
+                const sid = msg.sessionID || currentSessionID
+                if (!sid || sid === "{sessionID}") {
+                  emitVsCodeMessage({ type: "sandboxStatus", sessionID: sid, status: { enabled: false } } as any)
+                  break
+                }
+                const { data: status } = await client.sandbox.status({ sessionID: sid, directory }, { throwOnError: true })
+                emitVsCodeMessage({ type: "sandboxStatus", sessionID: sid, status } as any)
               } catch (e) {
                 console.error("[Emulator] Failed to request sandbox status:", e)
               }
               break
 
             case "requestSessionModelUsage":
-              if (msg.sessionID) {
+              if (msg.sessionID && msg.sessionID !== "{sessionID}") {
                 try {
-                  const { data: usage } = await client.session.usage({ sessionID: msg.sessionID, directory }, { throwOnError: true })
-                  emitVsCodeMessage({ type: "sessionModelUsageLoaded", sessionID: msg.sessionID, requestID: msg.requestID, usage } as any)
+                  const { data: usage } = await client.kilocode.sessionModelUsage({ sessionID: msg.sessionID, directory }, { throwOnError: true })
+                  emitVsCodeMessage({ type: "sessionModelUsageLoaded", sessionID: msg.sessionID, requestID: msg.requestID, data: usage } as any)
                 } catch (e) {
                   console.error("[Emulator] Failed to request session model usage:", e)
                 }
@@ -1181,7 +1292,7 @@ export function setupEmulator() {
             case "compact":
               if (msg.sessionID) {
                 try {
-                  await client.session.compact({
+                  await (client.session as any).compact({
                     sessionID: msg.sessionID,
                     directory,
                     model: msg.providerID && msg.modelID ? { providerID: msg.providerID, modelID: msg.modelID } : undefined
@@ -1209,6 +1320,10 @@ export function setupEmulator() {
               }
               break
 
+            case "enhancePrompt":
+              void handleEnhancePrompt(msg)
+              break
+
             // ── Git status ──
 
             case "requestGitStatus":
@@ -1216,6 +1331,21 @@ export function setupEmulator() {
                 type: "gitStatus",
                 repo: false,
               } as any)
+              break
+
+            case "requestAutoApproveState":
+              emitVsCodeMessage({ type: "autoApproveState", active: autoApproveEnabled } as any)
+              break
+
+            case "toggleAutoApprove":
+              autoApproveEnabled = !autoApproveEnabled
+              emitVsCodeMessage({ type: "autoApproveState", active: autoApproveEnabled } as any)
+              break
+
+            case "openSettingsTab":
+            case "persistModelSelection":
+            case "clearModelSelection":
+              console.log(`[Emulator] ${msg.type} called (no-op in browser)`)
               break
 
             default:

@@ -383,7 +383,7 @@ export const dict = {
   "prompt.action.sandbox.network.blocked": "Bloqueada",
   "prompt.action.sandbox.network.allowed": "Permitida",
   "prompt.action.sandbox.unrestricted": "Sin restricciones",
-  "prompt.action.sandbox.description.enabled": "Las escrituras se limitan a los directorios del proyecto y de Kilo.",
+  "prompt.action.sandbox.description.enabled": "Las escrituras se limitan a los directorios del proyecto y de Zara.",
   "prompt.action.sandbox.description.disabled":
     "Haz clic para restringir las escrituras en el sistema de archivos y el acceso a la red.",
   "prompt.action.sandbox.description.disabledNetworkAllowed":

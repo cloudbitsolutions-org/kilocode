@@ -378,7 +378,7 @@ export const dict = {
   "prompt.action.sandbox.network.blocked": "ブロック",
   "prompt.action.sandbox.network.allowed": "許可",
   "prompt.action.sandbox.unrestricted": "制限なし",
-  "prompt.action.sandbox.description.enabled": "書き込みはプロジェクトおよびKiloディレクトリ内に制限されます。",
+  "prompt.action.sandbox.description.enabled": "書き込みはプロジェクトおよびZaraディレクトリ内に制限されます。",
   "prompt.action.sandbox.description.disabled":
     "クリックすると、ファイルシステムへの書き込みとネットワークアクセスを制限します。",
   "prompt.action.sandbox.description.disabledNetworkAllowed":
