@@ -1,8 +1,8 @@
 import { createSignal } from "solid-js"
-import { ACCEPTED_IMAGE_TYPES, isAcceptedImageType, isDragLeavingComponent } from "./image-attachments-utils"
+import { isDragLeavingComponent } from "./image-attachments-utils"
 import { extractDropPaths, KILO_FILE_PATH_MIME } from "../utils/path-mentions"
 
-export interface ImageAttachment {
+export interface FileAttachment {
   id: string
   filename: string
   mime: string
@@ -12,8 +12,8 @@ export interface ImageAttachment {
 /** Callback for handling text/URI file path drops. */
 export type FilePathDropHandler = (paths: string[]) => void
 
-export function useImageAttachments() {
-  const [images, setImages] = createSignal<ImageAttachment[]>([])
+export function useFileAttachments() {
+  const [images, setImages] = createSignal<FileAttachment[]>([])
   const [dragging, setDragging] = createSignal(false)
   let onFilePaths: FilePathDropHandler | undefined
 
@@ -23,13 +23,12 @@ export function useImageAttachments() {
   }
 
   const add = (file: File) => {
-    if (!isAcceptedImageType(file.type)) return
     const reader = new FileReader()
     reader.onload = () => {
-      const attachment: ImageAttachment = {
+      const attachment: FileAttachment = {
         id: crypto.randomUUID(),
-        filename: file.name || "image",
-        mime: file.type,
+        filename: file.name || "file",
+        mime: file.type || "application/octet-stream",
         dataUrl: reader.result as string,
       }
       setImages((prev) => [...prev, attachment])
@@ -43,14 +42,25 @@ export function useImageAttachments() {
 
   const clear = () => setImages([])
 
-  const replace = (next: ImageAttachment[]) => setImages(next)
+  const replace = (next: FileAttachment[]) => setImages(next)
 
   const handlePaste = (event: ClipboardEvent) => {
-    const items = Array.from(event.clipboardData?.items ?? [])
-    const imageItems = items.filter((item) => item.kind === "file" && ACCEPTED_IMAGE_TYPES.includes(item.type))
-    if (imageItems.length === 0) return
+    const cb = event.clipboardData
+    if (!cb) return
+
+    // Standard way to get pasted files in many browsers / Electron
+    if (cb.files && cb.files.length > 0) {
+      event.preventDefault()
+      for (const file of Array.from(cb.files)) add(file)
+      return
+    }
+
+    // Fallback: check items array
+    const items = Array.from(cb.items ?? [])
+    const fileItems = items.filter((item) => item.kind === "file")
+    if (fileItems.length === 0) return
     event.preventDefault()
-    for (const item of imageItems) {
+    for (const item of fileItems) {
       const file = item.getAsFile()
       if (file) add(file)
     }
@@ -80,21 +90,24 @@ export function useImageAttachments() {
     const dt = event.dataTransfer
     if (!dt) return
 
-    // First: check for text/URI file path drops (VS Code explorer, editor tabs)
-    const paths = extractDropPaths(dt)
-    if (paths && paths.length > 0 && onFilePaths) {
-      onFilePaths(paths)
+    // Prioritize actual file drops from the OS over text/URI mentions.
+    // (VS Code explorer drags typically do not populate dt.files with File objects).
+    if (dt.files && dt.files.length > 0) {
+      for (const file of Array.from(dt.files)) {
+        add(file)
+      }
       return
     }
 
-    // Second: fall through to image file drops
-    const files = dt.files
-    if (!files) return
-    for (const file of Array.from(files)) add(file)
+    // Fall back to text/URI file path drops (VS Code explorer, editor tabs)
+    const paths = extractDropPaths(dt)
+    if (paths && paths.length > 0 && onFilePaths) {
+      onFilePaths(paths)
+    }
   }
 
   return {
-    images,
+    files: images,
     dragging,
     add,
     remove,

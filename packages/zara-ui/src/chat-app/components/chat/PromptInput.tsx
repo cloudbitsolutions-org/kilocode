@@ -32,10 +32,10 @@ import { hasGitChangesMention } from "../../hooks/git-changes-context-utils"
 import { useSlashCommand } from "../../hooks/useSlashCommand"
 import { useGhostText } from "../../hooks/useGhostText"
 import { useSpeechToText } from "../speech-to-text/useSpeechToText"
-import { useImageAttachments, type ImageAttachment } from "../../hooks/useImageAttachments"
+import { useFileAttachments, type FileAttachment } from "../../hooks/useImageAttachments"
 import { convertToMentionPath } from "../../utils/path-mentions"
 import { usePromptHistory } from "../../hooks/usePromptHistory"
-import { WandSparkles } from "@kilocode/kilo-ui/lucide"
+import { WandSparkles, Paperclip } from "@kilocode/kilo-ui/lucide"
 import {
   fileName,
   dirName,
@@ -105,8 +105,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const mention = useFileMention(vscode, sid, hasGit)
   const terminal = useTerminalContext(vscode)
   const git = useGitChangesContext(vscode, ctx, hasGit)
-  const imageAttach = useImageAttachments()
-  imageAttach.setFilePathDropHandler((paths) => {
+  const fileAttach = useFileAttachments()
+  fileAttach.setFilePathDropHandler((paths) => {
     const cwd = server.workspaceDirectory()
     const resolved = paths.map((p) => convertToMentionPath(p, cwd))
     const ref = textareaRef
@@ -130,6 +130,17 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   let highlightRef: HTMLDivElement | undefined
   let dropdownRef: HTMLDivElement | undefined
   let slashDropdownRef: HTMLDivElement | undefined
+  let fileInputRef: HTMLInputElement | undefined
+
+  const handleFileInputChange = (e: Event) => {
+    const target = e.target as HTMLInputElement
+    const files = target.files
+    if (!files) return
+    for (const file of Array.from(files)) {
+      fileAttach.add(file)
+    }
+    target.value = "" // Reset
+  }
 
   const boxKey = () => props.boxId ?? "prompt:default"
   const blockedHelpId = () => `${boxKey().replace(/[^a-zA-Z0-9_-]/g, "-")}-blocked-help`
@@ -142,7 +153,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     key: string,
     next: string,
     comments: ReviewComment[],
-    imgs: ImageAttachment[],
+    imgs: FileAttachment[],
     scroll = textareaRef?.scrollTop ?? scrolls.get(key) ?? 0,
   ) => {
     if (next) drafts.set(key, next)
@@ -157,7 +168,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const readDraft = () => ({
     text: text().trim(),
     comments: reviewComments(),
-    images: imageAttach.images(),
+    images: fileAttach.files(),
     scroll: textareaRef?.scrollTop ?? scrolls.get(draftKey()) ?? 0,
   })
 
@@ -200,7 +211,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     const sessionID = sandboxID()
     if (!sandboxVisible() || sandboxDisabled()) return
     const requestID = crypto.randomUUID()
-    if (!sessionID) saveDraft(draftKey(), text(), reviewComments(), imageAttach.images())
+    if (!sessionID) saveDraft(draftKey(), text(), reviewComments(), fileAttach.files())
     setSandboxRequests((current) => ({ ...current, [sessionID ?? ""]: requestID }))
     if (!sessionID) {
       vscode.postMessage({
@@ -292,14 +303,14 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   createEffect(
     on(draftKey, (key, prev) => {
       if (prev !== undefined && prev !== key) {
-        saveDraft(prev, untrack(text), untrack(reviewComments), untrack(imageAttach.images))
+        saveDraft(prev, untrack(text), untrack(reviewComments), untrack(fileAttach.files))
       }
       const draft = drafts.get(key) ?? ""
       const pending = reviewDrafts.get(key) ?? []
       const scroll = scrolls.get(key) ?? 0
       setText(draft)
       setReviewComments(pending)
-      imageAttach.replace(imageDrafts.get(key) ?? [])
+      fileAttach.replace(imageDrafts.get(key) ?? [])
       setEnhancing(false)
       preEnhanceText = null
       history.reset()
@@ -361,7 +372,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const onNewTaskRequest = () => {
     const draft = text().trim()
     const comments = reviewComments()
-    const imgs = imageAttach.images()
+    const imgs = fileAttach.files()
     const scroll = textareaRef?.scrollTop ?? 0
     session.clearCurrentSession()
     // After clearing, draftKey() points to the "new" bucket — save there
@@ -429,7 +440,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const isDisabled = () => !server.isConnected()
   const canUseSpeech = () => canUseSpeechToText(config(), provider.authStates())
   const speechModel = () => selectedSpeechToTextModel(config())
-  const hasInput = () => text().trim().length > 0 || imageAttach.images().length > 0 || reviewComments().length > 0
+  const hasInput = () => text().trim().length > 0 || fileAttach.files().length > 0 || reviewComments().length > 0
   const canSend = () =>
     !isDisabled() &&
     !terminal.pending() &&
@@ -471,7 +482,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const restoreFailed = (failed: SendMessageFailedMessage) => {
     // Only restore a failed draft when the user has not started another one.
-    if (text().trim() || reviewComments().length > 0 || imageAttach.images().length > 0) return
+    if (text().trim() || reviewComments().length > 0 || fileAttach.files().length > 0) return
 
     // If the user explicitly transitioned out of the original send's scope
     // (clearCurrentSession() or Delete on the current/draft session), don't
@@ -511,7 +522,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         textareaRef.focus()
       }
     }
-    const images = (failed.files ?? [])
+    const files = (failed.files ?? [])
       .filter((file) => file.mime.startsWith("image/") && file.url.startsWith("data:"))
       .map((file) => ({
         id: crypto.randomUUID(),
@@ -519,9 +530,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         mime: file.mime,
         dataUrl: file.url,
       }))
-    if (images.length === 0) return
-    imageAttach.replace(images)
-    imageDrafts.set(target, images)
+    if (files.length === 0) return
+    fileAttach.replace(files)
+    imageDrafts.set(target, files)
   }
 
   const handleSandboxMessage = (message: ExtensionMessage) => {
@@ -637,7 +648,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     }
 
     if (message.type === "appendReviewComments") {
-      const empty = !text().trim() && reviewComments().length === 0 && imageAttach.images().length === 0
+      const empty = !text().trim() && reviewComments().length === 0 && fileAttach.files().length === 0
       const merged = mergeReviewComments(reviewComments(), message.comments)
       replaceReviewComments(merged)
       if (message.autoSend && empty && !isDisabled() && !props.blocked?.()) {
@@ -662,7 +673,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       if (raw) {
         const source = scopeDraftKey(boxKey(), raw)
         const target = scopeDraftKey(boxKey(), sessionDraftKey(message.session.id))
-        if (source === draftKey()) saveDraft(source, text(), reviewComments(), imageAttach.images())
+        if (source === draftKey()) saveDraft(source, text(), reviewComments(), fileAttach.files())
         movePromptDraft({ text: drafts, comments: reviewDrafts, images: imageDrafts, scrolls }, source, target)
       }
       if (
@@ -703,7 +714,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   onCleanup(() => {
     // Persist current draft before unmounting
-    saveDraft(draftKey(), text(), reviewComments(), imageAttach.images())
+    saveDraft(draftKey(), text(), reviewComments(), fileAttach.files())
     if (sandboxRetry) clearTimeout(sandboxRetry)
     unsubAutoApprove()
     unsubscribe()
@@ -752,7 +763,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   }
 
   const handlePaste = (e: ClipboardEvent) => {
-    imageAttach.handlePaste(e)
+    fileAttach.handlePaste(e)
     // After pasting text, the textarea content changes but the layout may not
     // have reflowed yet, causing the caret position to be visually out of sync.
     // Defer height recalculation to after the browser completes the reflow.
@@ -918,7 +929,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     const context = ctx()
     const value = text()
     const comments = reviewComments()
-    const images = imageAttach.images()
+    const images = fileAttach.files()
     speech.stop({
       done: () => void handleSend(),
       ready: () =>
@@ -927,7 +938,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         ctx() === context &&
         text() === value &&
         reviewComments() === comments &&
-        imageAttach.images() === images,
+        fileAttach.files() === images,
     })
   }
 
@@ -983,7 +994,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       history.append(draft)
       setText("")
       clearReviewComments()
-      imageAttach.clear()
+      fileAttach.clear()
       mention.closeMention()
       slash.close()
       drafts.delete(draftKey())
@@ -1008,7 +1019,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       if (matched.enabled && !matched.enabled()) return
       setText("")
       clearReviewComments()
-      imageAttach.clear()
+      fileAttach.clear()
       mention.closeMention()
       slash.close()
       drafts.delete(draftKey())
@@ -1020,7 +1031,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       return
     }
 
-    const imgs = imageAttach.images()
+    const imgs = fileAttach.files()
     const pending = reviewComments()
     const review = pending.length > 0 ? formatReviewCommentsMarkdown(pending) : ""
     const message = draft && review ? `${review}\n\n${draft}` : draft || review
@@ -1082,7 +1093,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     history.reset()
     setText("")
     clearReviewComments()
-    imageAttach.clear()
+    fileAttach.clear()
     mention.closeMention()
     slash.close()
 
@@ -1092,10 +1103,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   return (
     <div
       class="prompt-input-container"
-      classList={{ "prompt-input-container--dragging": imageAttach.dragging() }}
-      onDragOver={imageAttach.handleDragOver}
-      onDragLeave={imageAttach.handleDragLeave}
-      onDrop={imageAttach.handleDrop}
+      classList={{ "prompt-input-container--dragging": fileAttach.dragging() }}
+      onDragOver={fileAttach.handleDragOver}
+      onDragLeave={fileAttach.handleDragLeave}
+      onDrop={fileAttach.handleDrop}
     >
       <Show when={reviewComments().length > 0}>
         <ReviewComments
@@ -1213,24 +1224,33 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           </Show>
         </div>
       </Show>
-      <Show when={imageAttach.images().length > 0}>
+      <Show when={fileAttach.files().length > 0}>
         <div class="image-attachments">
-          <For each={imageAttach.images()}>
-            {(img) => (
-              <div class="image-attachment">
-                <img
-                  src={img.dataUrl}
-                  alt={img.filename}
-                  title={img.filename}
-                  onClick={() =>
-                    vscode.postMessage({ type: "previewImage", dataUrl: img.dataUrl, filename: img.filename })
+          <For each={fileAttach.files()}>
+            {(file) => (
+              <div class="image-attachment" title={file.filename}>
+                <Show
+                  when={file.mime.startsWith("image/")}
+                  fallback={
+                    <div class="file-attachment-pill" style={{ display: "flex", "align-items": "center", gap: "4px", padding: "4px 8px", background: "var(--kilo-bg-tertiary)", "border-radius": "4px", color: "var(--kilo-fg-primary)" }}>
+                      <FileIcon />
+                      <span style={{ "max-width": "120px", overflow: "hidden", "text-overflow": "ellipsis", "white-space": "nowrap", "font-size": "12px" }}>{file.filename}</span>
+                    </div>
                   }
-                />
+                >
+                  <img
+                    src={file.dataUrl}
+                    alt={file.filename}
+                    onClick={() =>
+                      vscode.postMessage({ type: "previewImage", dataUrl: file.dataUrl, filename: file.filename })
+                    }
+                  />
+                </Show>
                 <button
                   type="button"
                   class="image-attachment-remove"
-                  onClick={() => imageAttach.remove(img.id)}
-                  aria-label="Remove image"
+                  onClick={() => fileAttach.remove(file.id)}
+                  aria-label="Remove attachment"
                 >
                   ×
                 </button>
@@ -1240,8 +1260,16 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         </div>
       </Show>
       <div class="prompt-input-wrapper">
+        <input
+          type="file"
+          multiple
+          class="hidden"
+          ref={fileInputRef}
+          onChange={handleFileInputChange}
+          style={{ display: "none" }}
+        />
         <div class="prompt-input-ghost-wrapper">
-          <div class="prompt-input-highlight-overlay" ref={highlightRef} aria-hidden="true" dir="auto">
+            <div class="prompt-input-highlight-overlay" ref={highlightRef} aria-hidden="true" dir="auto">
             <Index each={buildHighlightSegments(text(), highlightMentions())}>
               {(seg) => (
                 <Show when={seg().highlight} fallback={<span>{seg().text}</span>}>
@@ -1383,6 +1411,16 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               onToggle={toggleSandbox}
             />
           </Show>
+          <Tooltip value={"Attach files"} placement="top">
+            <Button
+              variant="ghost"
+              size="small"
+              onClick={() => fileInputRef?.click()}
+              aria-label="Attach files"
+            >
+              <Paperclip size={16} />
+            </Button>
+          </Tooltip>
           <Tooltip value={language.t("prompt.action.enhance")} placement="top">
             <Button
               variant="ghost"
