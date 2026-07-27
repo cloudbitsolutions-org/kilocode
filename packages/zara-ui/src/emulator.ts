@@ -72,6 +72,27 @@ const { client, directory } = getClient()
 let currentSessionID: string | null = null
 let selectedAgent: string | undefined = undefined
 let autoApproveEnabled = false
+const settingKey = "kilo-webview-settings"
+
+function loadSettings(): Record<string, unknown> {
+  try {
+    const raw = window.localStorage.getItem(settingKey)
+    return raw ? JSON.parse(raw) as Record<string, unknown> : {}
+  } catch (e) {
+    console.warn("[Emulator] Failed to load settings cache:", e)
+    return {}
+  }
+}
+
+function saveSettings(next: Record<string, unknown>) {
+  try {
+    window.localStorage.setItem(settingKey, JSON.stringify(next))
+  } catch (e) {
+    console.warn("[Emulator] Failed to persist settings cache:", e)
+  }
+}
+
+const settings = loadSettings()
 
 // ─── SSE Event Stream ───────────────────────────────────────────────────────
 
@@ -364,11 +385,11 @@ function setupEventStream() {
         if (ctl.signal.aborted) return
         const payload = event.payload ?? event
         if ((payload.type as string) !== "server.heartbeat") {
-          console.log("[Emulator SSE Raw Payload]", payload)
+          // console.log("[Emulator SSE Raw Payload]", payload)
         }
         const msg = mapSSEEvent(payload)
         if (msg) {
-          console.log("[Emulator SSE Mapped Msg]", msg)
+          // console.log("[Emulator SSE Mapped Msg]", msg)
           if (msg.type === "permissionRequest" && autoApproveEnabled) {
             void client.permission.respond({
               sessionID: (msg as any).permission.sessionID,
@@ -820,6 +841,37 @@ async function handleRevertSession(msg: any) {
   }
 }
 
+async function handleSuggestionAccept(msg: any) {
+  try {
+    await client.suggestion.accept({
+      requestID: msg.requestID,
+      index: msg.index,
+      directory,
+    }, { throwOnError: true })
+  } catch (e) {
+    console.error("[Emulator] Failed to accept suggestion:", e)
+    emitVsCodeMessage({
+      type: "suggestionError",
+      requestID: msg.requestID,
+    } as any)
+  }
+}
+
+async function handleSuggestionDismiss(msg: any) {
+  try {
+    await client.suggestion.dismiss({
+      requestID: msg.requestID,
+      directory,
+    }, { throwOnError: true })
+  } catch (e) {
+    console.error("[Emulator] Failed to dismiss suggestion:", e)
+    emitVsCodeMessage({
+      type: "suggestionError",
+      requestID: msg.requestID,
+    } as any)
+  }
+}
+
 // ─── Core Emulator ──────────────────────────────────────────────────────────
 
 function injectVscodeThemeVars() {
@@ -944,14 +996,11 @@ function injectVscodeThemeVars() {
 }
 
 export function setupEmulator() {
-  console.log("[Zara UI] Setting up VS Code API Emulator...")
   injectVscodeThemeVars()
 
   ;(window as any).acquireVsCodeApi = () => {
     return {
       postMessage: async (msg: any) => {
-        console.log("[Emulator] \u2190", msg.type, msg)
-
         try {
           switch (msg.type) {
             case "webviewReady":
@@ -1000,7 +1049,7 @@ export function setupEmulator() {
             case "requestTimelineSetting":
               emitVsCodeMessage({
                 type: "timelineSettingLoaded",
-                visible: false,
+                visible: settings.showTaskTimeline !== false,
               })
               break
 
@@ -1071,6 +1120,10 @@ export function setupEmulator() {
 
             case "abort":
               await handleAbort(msg)
+              break
+
+            case "reload":
+              window.location.reload()
               break
 
             case "loadMessages":
@@ -1283,7 +1336,14 @@ export function setupEmulator() {
 
             case "updateSetting":
               try {
-                await client.config.update({ directory, [msg.key]: msg.value } as any, { throwOnError: true })
+                settings[msg.key] = msg.value
+                saveSettings(settings)
+                if (msg.key === "showTaskTimeline") {
+                  emitVsCodeMessage({
+                    type: "timelineSettingLoaded",
+                    visible: msg.value !== false,
+                  } as any)
+                }
               } catch (e) {
                 console.error("[Emulator] Failed to update setting:", e)
               }
@@ -1291,15 +1351,7 @@ export function setupEmulator() {
 
             case "compact":
               if (msg.sessionID) {
-                try {
-                  await (client.session as any).compact({
-                    sessionID: msg.sessionID,
-                    directory,
-                    model: msg.providerID && msg.modelID ? { providerID: msg.providerID, modelID: msg.modelID } : undefined
-                  } as any)
-                } catch (e) {
-                  console.error("[Emulator] Failed to compact session:", e)
-                }
+                console.warn("[Emulator] Session compaction is not supported in the emulator environment.")
               }
               break
 
@@ -1342,11 +1394,18 @@ export function setupEmulator() {
               emitVsCodeMessage({ type: "autoApproveState", active: autoApproveEnabled } as any)
               break
 
-            case "openSettingsTab":
-            case "persistModelSelection":
-            case "clearModelSelection":
-              console.log(`[Emulator] ${msg.type} called (no-op in browser)`)
-              break
+             case "openSettingsTab":
+             case "persistModelSelection":
+             case "clearModelSelection":
+               break
+
+             case "suggestionAccept":
+               await handleSuggestionAccept(msg)
+               break
+
+             case "suggestionDismiss":
+               await handleSuggestionDismiss(msg)
+               break
 
             default:
               console.log(
