@@ -337,10 +337,16 @@ function setupEventStream() {
       })
       for await (const event of events.stream) {
         if (ctl.signal.aborted) return
-        const msg = mapSSEEvent(event)
+        const payload = event.payload ?? event
+        const msg = mapSSEEvent(payload)
         if (msg) {
           emitVsCodeMessage(msg)
         }
+      }
+      
+      // Stream ended normally, we must reconnect
+      if (!ctl.signal.aborted) {
+        setTimeout(() => setupEventStream(), 1000)
       }
     } catch (e) {
       console.warn("[Emulator] Event stream error:", e)
@@ -748,8 +754,130 @@ async function handleRevertSession(msg: any) {
 
 // ─── Core Emulator ──────────────────────────────────────────────────────────
 
+function injectVscodeThemeVars() {
+  const urlParams = new URLSearchParams(window.location.search)
+  const theme = urlParams.get("theme") || "dark"
+  const isDark = theme === "dark"
+  const root = document.documentElement
+
+  if (isDark) {
+    document.body.classList.add("vscode-dark")
+    root.style.setProperty("--vscode-editor-background", "#1e1e1e")
+    root.style.setProperty("--vscode-sideBar-background", "#252526")
+    root.style.setProperty("--vscode-foreground", "#cccccc")
+    root.style.setProperty("--vscode-editor-foreground", "#d4d4d4")
+    root.style.setProperty("--vscode-descriptionForeground", "#858585")
+    root.style.setProperty("--vscode-disabledForeground", "#6b6b6b")
+    root.style.setProperty("--vscode-input-background", "#3c3c3c")
+    root.style.setProperty("--vscode-button-background", "#0e639c")
+    root.style.setProperty("--vscode-button-foreground", "#ffffff")
+    root.style.setProperty("--vscode-button-hoverBackground", "#1177bb")
+    root.style.setProperty("--vscode-button-secondaryBackground", "#3a3d41")
+    root.style.setProperty("--vscode-button-secondaryForeground", "#cccccc")
+    root.style.setProperty("--vscode-button-secondaryHoverBackground", "#45494e")
+    root.style.setProperty("--vscode-panel-border", "#454545")
+    root.style.setProperty("--vscode-widget-border", "#454545")
+    root.style.setProperty("--vscode-focusBorder", "#007fd4")
+    root.style.setProperty("--vscode-textLink-foreground", "#3794ff")
+    root.style.setProperty("--vscode-list-hoverBackground", "#2a2d2e")
+    root.style.setProperty("--vscode-list-activeSelectionBackground", "#094771")
+    root.style.setProperty("--vscode-list-activeSelectionForeground", "#ffffff")
+    root.style.setProperty("--vscode-list-inactiveSelectionBackground", "#37373d")
+    root.style.setProperty("--vscode-editorWidget-background", "#252526")
+    root.style.setProperty("--vscode-editorGroup-border", "#303031")
+    root.style.setProperty("--vscode-editorGroupHeader-tabsBackground", "#252526")
+    root.style.setProperty("--vscode-icon-foreground", "#c5c5c5")
+    root.style.setProperty("--vscode-toolbar-hoverBackground", "#5a5d5e50")
+    root.style.setProperty("--vscode-toolbar-activeBackground", "#717171")
+    root.style.setProperty("--vscode-charts-green", "#89d185")
+    root.style.setProperty("--vscode-charts-yellow", "#cca700")
+    root.style.setProperty("--vscode-charts-red", "#f14c4c")
+    root.style.setProperty("--vscode-charts-blue", "#3794ff")
+    root.style.setProperty("--vscode-charts-orange", "#d18616")
+    root.style.setProperty("--vscode-charts-purple", "#b180d7")
+    root.style.setProperty("--vscode-errorForeground", "#f14c4c")
+    root.style.setProperty("--vscode-gitDecoration-addedResourceForeground", "#81b88b")
+    root.style.setProperty("--vscode-gitDecoration-deletedResourceForeground", "#c74e39")
+    root.style.setProperty("--vscode-gitDecoration-modifiedResourceForeground", "#e2c08d")
+    root.style.setProperty("--vscode-debugTokenExpression-string", "#ce9178")
+    root.style.setProperty("--vscode-debugTokenExpression-number", "#b5cea8")
+    root.style.setProperty("--vscode-debugTokenExpression-name", "#9cdcfe")
+    root.style.setProperty("--vscode-debugTokenExpression-type", "#4ec9b0")
+    root.style.setProperty("--vscode-editorLineNumber-foreground", "#858585")
+    root.style.setProperty("--vscode-input-border", "#3c3c3c")
+    root.style.setProperty("--vscode-input-foreground", "#cccccc")
+    root.style.setProperty("--vscode-editorWidget-border", "#454545")
+    root.style.setProperty("--vscode-dropdown-background", "#3c3c3c")
+    root.style.setProperty("--vscode-dropdown-border", "#454545")
+    root.style.setProperty("--vscode-dropdown-foreground", "#cccccc")
+    root.style.setProperty("--vscode-menu-background", "#252526")
+    root.style.setProperty("--vscode-badge-background", "#4d4d4d")
+    root.style.setProperty("--vscode-badge-foreground", "#ffffff")
+    root.style.setProperty("--vscode-editorStickyScrollHover-background", "#2a2d2e")
+    root.style.setProperty("--vscode-editor-inactiveSelectionBackground", "#3a3d41")
+    root.style.setProperty("--vscode-contrastBorder", "transparent")
+  } else {
+    document.body.classList.add("vscode-light")
+    root.style.setProperty("--vscode-editor-background", "#ffffff")
+    root.style.setProperty("--vscode-sideBar-background", "#f3f3f3")
+    root.style.setProperty("--vscode-foreground", "#616161")
+    root.style.setProperty("--vscode-editor-foreground", "#333333")
+    root.style.setProperty("--vscode-descriptionForeground", "#767676")
+    root.style.setProperty("--vscode-disabledForeground", "#a0a0a0")
+    root.style.setProperty("--vscode-input-background", "#ffffff")
+    root.style.setProperty("--vscode-button-background", "#007acc")
+    root.style.setProperty("--vscode-button-foreground", "#ffffff")
+    root.style.setProperty("--vscode-button-hoverBackground", "#0062a3")
+    root.style.setProperty("--vscode-button-secondaryBackground", "#f3f3f3")
+    root.style.setProperty("--vscode-button-secondaryForeground", "#616161")
+    root.style.setProperty("--vscode-button-secondaryHoverBackground", "#e8e8e8")
+    root.style.setProperty("--vscode-panel-border", "#cecece")
+    root.style.setProperty("--vscode-widget-border", "#cecece")
+    root.style.setProperty("--vscode-focusBorder", "#0090f1")
+    root.style.setProperty("--vscode-textLink-foreground", "#006ab1")
+    root.style.setProperty("--vscode-list-hoverBackground", "#e8e8e8")
+    root.style.setProperty("--vscode-list-activeSelectionBackground", "#0060c0")
+    root.style.setProperty("--vscode-list-activeSelectionForeground", "#ffffff")
+    root.style.setProperty("--vscode-list-inactiveSelectionBackground", "#e4e6f1")
+    root.style.setProperty("--vscode-editorWidget-background", "#f3f3f3")
+    root.style.setProperty("--vscode-editorGroup-border", "#e7e7e7")
+    root.style.setProperty("--vscode-editorGroupHeader-tabsBackground", "#f8f8f8")
+    root.style.setProperty("--vscode-icon-foreground", "#424242")
+    root.style.setProperty("--vscode-toolbar-hoverBackground", "#b8b8b850")
+    root.style.setProperty("--vscode-toolbar-activeBackground", "#a6a6a6")
+    root.style.setProperty("--vscode-charts-green", "#388a34")
+    root.style.setProperty("--vscode-charts-yellow", "#bf8803")
+    root.style.setProperty("--vscode-charts-red", "#e51400")
+    root.style.setProperty("--vscode-charts-blue", "#1a85ff")
+    root.style.setProperty("--vscode-charts-orange", "#d18616")
+    root.style.setProperty("--vscode-charts-purple", "#652d90")
+    root.style.setProperty("--vscode-errorForeground", "#e51400")
+    root.style.setProperty("--vscode-gitDecoration-addedResourceForeground", "#587c0c")
+    root.style.setProperty("--vscode-gitDecoration-deletedResourceForeground", "#ad0707")
+    root.style.setProperty("--vscode-gitDecoration-modifiedResourceForeground", "#895503")
+    root.style.setProperty("--vscode-debugTokenExpression-string", "#a31515")
+    root.style.setProperty("--vscode-debugTokenExpression-number", "#098658")
+    root.style.setProperty("--vscode-debugTokenExpression-name", "#001080")
+    root.style.setProperty("--vscode-debugTokenExpression-type", "#267f99")
+    root.style.setProperty("--vscode-editorLineNumber-foreground", "#767676")
+    root.style.setProperty("--vscode-input-border", "#cecece")
+    root.style.setProperty("--vscode-input-foreground", "#333333")
+    root.style.setProperty("--vscode-editorWidget-border", "#c8c8c8")
+    root.style.setProperty("--vscode-dropdown-background", "#ffffff")
+    root.style.setProperty("--vscode-dropdown-border", "#cecece")
+    root.style.setProperty("--vscode-dropdown-foreground", "#616161")
+    root.style.setProperty("--vscode-menu-background", "#ffffff")
+    root.style.setProperty("--vscode-badge-background", "#c4c4c4")
+    root.style.setProperty("--vscode-badge-foreground", "#333333")
+    root.style.setProperty("--vscode-editorStickyScrollHover-background", "#e8e8e8")
+    root.style.setProperty("--vscode-editor-inactiveSelectionBackground", "#e4e6f1")
+    root.style.setProperty("--vscode-contrastBorder", "transparent")
+  }
+}
+
 export function setupEmulator() {
   console.log("[Zara UI] Setting up VS Code API Emulator...")
+  injectVscodeThemeVars()
 
   ;(window as any).acquireVsCodeApi = () => {
     return {
@@ -999,6 +1127,70 @@ export function setupEmulator() {
               break
 
             // ── Memory ──
+
+            case "requestIndexingStatus":
+              try {
+                const { data: status } = await client.indexing.status({ directory }, { throwOnError: true })
+                emitVsCodeMessage({ type: "indexingStatusLoaded", status } as any)
+              } catch (e) {
+                console.error("[Emulator] Failed to request indexing status:", e)
+              }
+              break
+
+            case "requestImageModels":
+              emitVsCodeMessage({ type: "imageModelsLoaded", models: [] } as any)
+              break
+
+            case "requestMcpStatus":
+              try {
+                const { data: status } = await client.mcp.status({ directory }, { throwOnError: true })
+                emitVsCodeMessage({ type: "mcpStatusLoaded", status } as any)
+              } catch (e) {
+                console.error("[Emulator] Failed to request MCP status:", e)
+              }
+              break
+
+            case "requestSandboxStatus":
+              try {
+                const { data: status } = await client.sandbox.status({ directory }, { throwOnError: true })
+                emitVsCodeMessage({ type: "sandboxStatusLoaded", status } as any)
+              } catch (e) {
+                console.error("[Emulator] Failed to request sandbox status:", e)
+              }
+              break
+
+            case "requestSessionModelUsage":
+              if (msg.sessionID) {
+                try {
+                  const { data: usage } = await client.session.usage({ sessionID: msg.sessionID, directory }, { throwOnError: true })
+                  emitVsCodeMessage({ type: "sessionModelUsageLoaded", sessionID: msg.sessionID, requestID: msg.requestID, usage } as any)
+                } catch (e) {
+                  console.error("[Emulator] Failed to request session model usage:", e)
+                }
+              }
+              break
+
+            case "updateSetting":
+              try {
+                await client.config.update({ directory, [msg.key]: msg.value } as any, { throwOnError: true })
+              } catch (e) {
+                console.error("[Emulator] Failed to update setting:", e)
+              }
+              break
+
+            case "compact":
+              if (msg.sessionID) {
+                try {
+                  await client.session.compact({
+                    sessionID: msg.sessionID,
+                    directory,
+                    model: msg.providerID && msg.modelID ? { providerID: msg.providerID, modelID: msg.modelID } : undefined
+                  } as any)
+                } catch (e) {
+                  console.error("[Emulator] Failed to compact session:", e)
+                }
+              }
+              break
 
             case "requestMemory":
               try {

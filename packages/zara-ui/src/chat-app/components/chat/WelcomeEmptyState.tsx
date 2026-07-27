@@ -12,15 +12,11 @@ interface WelcomeEmptyStateProps {
   onShowHistory?: () => void
 }
 
-export const KiloLogo = () => {
-  const icons = (window as { ICONS_BASE_URI?: string }).ICONS_BASE_URI || ""
-  const light =
-    document.body.classList.contains("vscode-light") || document.body.classList.contains("vscode-high-contrast-light")
-  const file = light ? "kilo-light.svg" : "kilo-dark.svg"
-
+export const ZaraLogo = () => {
   return (
-    <div class="kilo-logo">
-      <img src={`${icons}/${file}`} alt="Kilo Code" />
+    <div class="zara-logo" style={{ "font-size": "24px", "font-weight": "700", "color": "var(--vscode-foreground)", "opacity": "0.9", "display": "flex", "align-items": "center", "gap": "10px", "margin-bottom": "8px" }}>
+      <Icon name="terminal" size="large" />
+      <span>Code Zara</span>
     </div>
   )
 }
@@ -33,7 +29,7 @@ export const WelcomeEmptyState: Component<WelcomeEmptyStateProps> = (props) => {
 
   return (
     <div class="message-list-empty">
-      <KiloLogo />
+      <ZaraLogo />
       <p class="kilo-about-text">{language.t("session.messages.welcome")}</p>
       <Show when={recent().length > 0 && props.onSelectSession}>
         <div class="recent-sessions">
@@ -54,10 +50,6 @@ export const WelcomeEmptyState: Component<WelcomeEmptyStateProps> = (props) => {
           </Show>
         </div>
       </Show>
-      <button class="feedback-button" onClick={() => dialog.show(() => <FeedbackDialog />)}>
-        <Icon name="bubble-5" size="small" />
-        {language.t("feedback.button")}
-      </button>
     </div>
   )
 }

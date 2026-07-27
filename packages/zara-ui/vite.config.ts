@@ -5,6 +5,11 @@ import { resolve } from "path"
 export default defineConfig({
   base: process.env.KILO_ASSISTANT_UI_BASE ?? "/",
   plugins: [solid()],
+  esbuild: {
+    logOverride: {
+      "unsupported-jsx-comment": "silent",
+    },
+  },
   resolve: {
     alias: {
       "~": resolve(__dirname, "src"),

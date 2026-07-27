@@ -3,7 +3,7 @@ import { Spinner } from "@kilocode/kilo-ui/spinner"
 import { useWorkStyle } from "../../context/work-style"
 import { useLanguage } from "../../context/language"
 import { WorkStylePicker } from "../shared/WorkStylePicker"
-import { KiloLogo, WelcomeEmptyState } from "./WelcomeEmptyState"
+import { ZaraLogo, WelcomeEmptyState } from "./WelcomeEmptyState"
 
 interface SidebarEmptyStateProps {
   onSelectSession?: (id: string) => void
@@ -29,7 +29,7 @@ export const SidebarEmptyState: Component<SidebarEmptyStateProps> = (props) => {
         fallback={<WelcomeEmptyState onSelectSession={props.onSelectSession} onShowHistory={props.onShowHistory} />}
       >
         <div class="message-list-empty work-style-empty">
-          <KiloLogo />
+          <ZaraLogo />
           <h1 class="work-style-welcome">{language.t("workStyle.onboarding.welcome")}</h1>
           <WorkStylePicker />
         </div>

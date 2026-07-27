@@ -36,16 +36,29 @@ export namespace ZaraUiAssets {
 
   async function dir() {
     const override = process.env.KILO_ASSISTANT_UI_ASSET_DIR
-    if (override && (await ready(override, false))) return override
+    if (override && (await ready(override, false))) {
+      log.info("Resolved Zara UI assets to override", { override })
+      return override
+    }
 
     const copied = path.join(path.dirname(process.execPath), "zara-assistant-ui")
-    if (await ready(copied, false)) return copied
+    if (await ready(copied, false)) {
+      log.info("Resolved Zara UI assets to copied", { copied })
+      return copied
+    }
 
     const app = source()
     const out = path.join(app, "dist")
-    if (!existsSync(path.join(app, "package.json"))) return undefined
-    if (await ready(out, true)) return out
+    if (!existsSync(path.join(app, "package.json"))) {
+      log.info("Zara UI source missing package.json", { app })
+      return undefined
+    }
+    if (await ready(out, true)) {
+      log.info("Resolved Zara UI assets to source dist", { out })
+      return out
+    }
 
+    log.info("Building Zara UI assets from source", { app, out })
     return await build(app, out)
   }
 
