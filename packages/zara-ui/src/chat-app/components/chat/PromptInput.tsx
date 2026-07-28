@@ -175,6 +175,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const [text, setText] = createSignal("")
   const [reviewComments, setReviewComments] = createSignal<ReviewComment[]>([])
   const [enhancing, setEnhancing] = createSignal(false)
+  const [isMobileCollapsed, setIsMobileCollapsed] = createSignal(true)
   const [autoApprove, setAutoApprove] = createSignal(false)
   const [sandboxes, setSandboxes] = createSignal<Record<string, SandboxState>>({})
   const [sandboxDefault, setSandboxDefault] = createSignal<SandboxDefaultState>()
@@ -1101,8 +1102,16 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   }
 
   return (
-    <div
-      class="prompt-input-container"
+    <div class="prompt-input-mobile-wrapper" classList={{ "prompt-input-mobile-wrapper--collapsed": isMobileCollapsed() }}>
+      <button 
+        class="prompt-input-mobile-toggler" 
+        onClick={() => setIsMobileCollapsed(false)}
+        aria-label="Expand prompt input"
+      >
+        <div class="prompt-input-mobile-toggler-line" />
+      </button>
+      <div
+        class="prompt-input-container"
       classList={{ "prompt-input-container--dragging": fileAttach.dragging() }}
       onDragOver={fileAttach.handleDragOver}
       onDragLeave={fileAttach.handleDragLeave}
@@ -1467,8 +1476,22 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               </Button>
             </Tooltip>
           </Show>
+          <Button
+            variant="ghost"
+            size="small"
+            class="prompt-input-mobile-collapse-btn"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setIsMobileCollapsed(true)
+            }}
+            aria-label="Collapse prompt input"
+          >
+            <Icon name="chevron-down" size="small" />
+          </Button>
         </div>
       </div>
+    </div>
     </div>
   )
 }

@@ -412,8 +412,8 @@
 
 .prompt-input-hint {
   display: flex;
-  flex-wrap: nowrap;
-  align-items: flex-start;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
   font-size: var(--kilo-font-size-11);
   color: var(--vscode-descriptionForeground);
@@ -424,7 +424,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  flex: 1;
+  flex: 1 1 200px;
   min-width: 0;
 
   [data-component="button"] {
@@ -708,4 +708,59 @@
 
 .enhance-spinner {
   animation: enhance-spin 1s linear infinite;
+}
+
+/* ============================================
+   Mobile Collapse Styles
+   ============================================ */
+
+.prompt-input-mobile-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.prompt-input-mobile-toggler {
+  display: none;
+}
+
+.prompt-input-mobile-collapse-btn {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .prompt-input-mobile-wrapper--collapsed .prompt-input-container {
+    display: none !important;
+  }
+  
+  .prompt-input-mobile-wrapper--collapsed .prompt-input-mobile-toggler {
+    display: flex;
+    position: absolute;
+    right: 0;
+    bottom: 20px;
+    width: 24px;
+    height: 64px;
+    background-color: var(--input-base, var(--vscode-input-background, #3c3c3c));
+    border: 1px solid var(--border-weak-base, var(--vscode-input-border, #3c3c3c));
+    border-right: none;
+    border-radius: 12px 0 0 12px;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    box-shadow: -2px 0 8px rgba(0,0,0,0.2);
+    padding: 0;
+  }
+
+  .prompt-input-mobile-toggler-line {
+    width: 4px;
+    height: 24px;
+    background-color: var(--text-weak, var(--vscode-descriptionForeground, #888));
+    border-radius: 2px;
+  }
+
+  .prompt-input-mobile-collapse-btn {
+    display: flex !important;
+  }
 }

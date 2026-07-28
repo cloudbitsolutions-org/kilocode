@@ -6,7 +6,11 @@ import type { ExtensionMessage } from "./chat-app/types/messages"
 function getClient() {
   const urlParams = new URLSearchParams(window.location.search)
   const baseUrl = urlParams.get("url") || window.location.origin
-  const directory = urlParams.get("dir") || urlParams.get("project") || "/"
+  let directory = urlParams.get("dir") || urlParams.get("project") || "/"
+
+  if (directory === "/workspace" && ["localhost", "127.0.0.1"].includes(window.location.hostname)) {
+    directory = ""
+  }
 
   // Create a base64 basic auth token "kilo:kilo"
   const token = btoa("kilo:kilo")
@@ -437,7 +441,10 @@ async function handleRequestAgents() {
       const visible = agents.filter(
         (a: any) => a.mode !== "subagent" && !a.hidden
       )
-      const defaultAgent = visible.length > 0 ? visible[0].name : "code"
+      let defaultAgent = visible.length > 0 ? visible[0].name : "code"
+      if (settings.selectedAgent && visible.some((a: any) => a.name === settings.selectedAgent)) {
+        defaultAgent = settings.selectedAgent as string
+      }
       emitVsCodeMessage({
         type: "agentsLoaded",
         agents: visible as any,
@@ -1083,21 +1090,21 @@ export function setupEmulator() {
             case "requestVariants":
               emitVsCodeMessage({
                 type: "variantsLoaded",
-                variants: {} as any,
+                variants: (settings.variants as any) || {},
               })
               break
 
             case "requestModelSelections":
               emitVsCodeMessage({
                 type: "modelSelectionsLoaded",
-                selections: {} as any,
+                selections: (settings.modelSelections as any) || {},
               })
               break
 
             case "requestRecents":
               emitVsCodeMessage({
                 type: "recentsLoaded",
-                recents: [],
+                recents: (settings.recents as any) || [],
               })
               break
 
@@ -1164,6 +1171,8 @@ export function setupEmulator() {
 
             case "selectAgent":
               selectedAgent = msg.agent
+              settings.selectedAgent = msg.agent
+              saveSettings(settings)
               break
 
             case "selectModel":
@@ -1244,10 +1253,54 @@ export function setupEmulator() {
 
             case "requestIndexingStatus":
               try {
-                const { data: status } = await client.indexing.status({ directory }, { throwOnError: true })
+                const { data: status } = await client.indexing.status({ directory: directory || undefined }, { throwOnError: true })
                 emitVsCodeMessage({ type: "indexingStatusLoaded", status } as any)
               } catch (e) {
                 console.error("[Emulator] Failed to request indexing status:", e)
+              }
+              break
+
+            case "requestIndexingSettings":
+              emitVsCodeMessage({
+                type: "indexingSettingsLoaded",
+                settings: { showButtonWhenDisabled: true },
+              })
+              break
+
+            case "requestFileSearch":
+              try {
+                const query = msg.query
+                const [fileRes, folderRes] = await Promise.all([
+                  client.find.files({ query, directory: directory || undefined, type: "file", limit: 50 }).catch(() => ({ data: [] })),
+                  client.find.files({ query, directory: directory || undefined, type: "directory", limit: 50 }).catch(() => ({ data: [] }))
+                ])
+                const files = fileRes.data || []
+                const folders = folderRes.data || []
+                
+                const items: any[] = []
+                for (const f of folders) {
+                  items.push({ path: f, type: "folder" })
+                }
+                for (const f of files) {
+                  items.push({ path: f, type: "file" })
+                }
+                
+                emitVsCodeMessage({
+                  type: "fileSearchResult",
+                  paths: files,
+                  items,
+                  dir: directory,
+                  requestId: msg.requestId
+                } as any)
+              } catch (e) {
+                console.error("[Emulator] Failed to request file search:", e)
+                emitVsCodeMessage({
+                  type: "fileSearchResult",
+                  paths: [],
+                  items: [],
+                  dir: directory,
+                  requestId: msg.requestId
+                } as any)
               }
               break
 
@@ -1394,9 +1447,40 @@ export function setupEmulator() {
               emitVsCodeMessage({ type: "autoApproveState", active: autoApproveEnabled } as any)
               break
 
+             case "openSettingsPanel":
              case "openSettingsTab":
-             case "persistModelSelection":
-             case "clearModelSelection":
+               window.parent.postMessage({ type: 'navigateZaraCli', path: msg.tab ? `/console/settings/${msg.tab}` : '/console/settings' }, "*")
+               break
+             case "persistModelSelection": {
+               const modelSelections = (settings.modelSelections as Record<string, { providerID: string, modelID: string }>) || {}
+               modelSelections[msg.agent] = { providerID: msg.providerID, modelID: msg.modelID }
+               settings.modelSelections = modelSelections
+               saveSettings(settings)
+               break
+             }
+             case "clearModelSelection": {
+               const modelSelections = (settings.modelSelections as Record<string, { providerID: string, modelID: string }>) || {}
+               delete modelSelections[msg.agent]
+               settings.modelSelections = modelSelections
+               saveSettings(settings)
+               break
+             }
+
+             case "persistVariant": {
+               const variants = (settings.variants as Record<string, string>) || {}
+               variants[msg.key] = msg.value
+               settings.variants = variants
+               saveSettings(settings)
+               break
+             }
+
+             case "persistRecents":
+               try {
+                 settings.recents = msg.recents
+                 saveSettings(settings)
+               } catch (e) {
+                 console.error("[Emulator] Failed to persist recents:", e)
+               }
                break
 
              case "suggestionAccept":
