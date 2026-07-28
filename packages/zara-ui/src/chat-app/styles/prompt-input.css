@@ -4,7 +4,6 @@
 
 .prompt-input-container {
   position: relative;
-  margin: 12px;
   border-radius: 0.25rem;
   background-color: var(--input-base, var(--vscode-input-background, #3c3c3c));
   border: 1px solid var(--border-weak-base, var(--vscode-input-border, #3c3c3c));
@@ -719,6 +718,7 @@
   display: flex;
   flex-direction: column;
   width: 100%;
+  margin: 12px;
 }
 
 .prompt-input-mobile-toggler {
@@ -761,6 +761,6 @@
   }
 
   .prompt-input-mobile-collapse-btn {
-    display: flex !important;
+    display: inline-flex !important;
   }
 }

@@ -8,7 +8,7 @@
   width: 100%;
 }
 
-.chat-input > .new-task-button-wrapper + .prompt-input-container {
+.chat-input > .new-task-button-wrapper + .prompt-input-mobile-wrapper {
   margin-top: 0;
 }
 

@@ -261,7 +261,7 @@
   margin-inline: auto;
 }
 
-.chat-view .prompt-input-container,
+.chat-view .prompt-input-mobile-wrapper,
 .chat-view .new-task-button-wrapper {
   box-sizing: border-box;
   width: min(

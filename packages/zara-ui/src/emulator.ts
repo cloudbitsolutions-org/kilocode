@@ -1189,11 +1189,11 @@ export function setupEmulator() {
               await handlePermissionResponse(msg)
               break
 
-            case "replyToQuestion":
+            case "questionReply":
               await handleQuestionReply(msg)
               break
 
-            case "rejectQuestion":
+            case "questionReject":
               await handleQuestionReject(msg)
               break
 
