@@ -32,6 +32,7 @@ interface ChatViewProps {
   onForkMessage?: (sessionId: string, messageId: string) => void
   onForkSession?: (sessionId: string) => void
   readonly?: boolean
+  onBack?: () => void
   /** When true, show the "Continue in Worktree" button. Defaults to true in the sidebar. */
   continueInWorktree?: boolean
   promptBoxId?: string
@@ -326,7 +327,7 @@ export const ChatView: Component<ChatViewProps> = (props) => {
 
   return (
     <div class="chat-view">
-      <TaskHeader readonly={props.readonly} />
+      <TaskHeader readonly={props.readonly} onBack={props.onBack} />
       <div class="chat-messages-wrapper">
         <div class="chat-messages">
           <Show

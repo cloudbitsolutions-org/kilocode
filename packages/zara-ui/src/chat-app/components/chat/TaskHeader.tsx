@@ -29,6 +29,7 @@ import { formatCompactCount } from "../../utils/format"
 
 interface TaskHeaderProps {
   readonly?: boolean
+  onBack?: () => void
 }
 
 export const TaskHeader: Component<TaskHeaderProps> = (props) => {
@@ -169,6 +170,15 @@ export const TaskHeader: Component<TaskHeaderProps> = (props) => {
     <Show when={hasMessages()}>
       <div data-component="task-header">
         <div data-slot="task-header-title">
+          <Show when={props.onBack}>
+            <IconButton
+              icon="arrow-left"
+              size="small"
+              variant="ghost"
+              onClick={props.onBack}
+              aria-label="Back to parent session"
+            />
+          </Show>
           <Show
             when={!renaming()}
             fallback={

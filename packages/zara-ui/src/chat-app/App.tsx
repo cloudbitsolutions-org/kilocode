@@ -232,6 +232,7 @@ export const MermaidDownloadBridge: Component = () => {
 const AppContent: Component = () => {
   const [currentView, setCurrentView] = createSignal<ViewType>("newTask")
   const [settingsTab, setSettingsTab] = createSignal<string | undefined>()
+  const [sessionStack, setSessionStack] = createSignal<string[]>([])
   // legacy-migration: state-driven flag independent of currentView to avoid
   // race conditions with SettingsEditorProvider's navigate messages.
   const [migrationNeeded, setMigrationNeeded] = createSignal(false)
@@ -307,6 +308,10 @@ const AppContent: Component = () => {
       handleForked(message)
       if (message?.type === "viewSubAgentSession" && message.sessionID) {
         console.log("[Kilo New] App: 🔍 viewSubAgentSession:", message.sessionID)
+        const parent = session.currentSessionID()
+        if (parent && parent !== message.sessionID) {
+          setSessionStack((prev) => [...prev, parent])
+        }
         session.setCurrentSessionID(message.sessionID)
         setCurrentView("subAgentViewer")
       }
@@ -381,7 +386,15 @@ const AppContent: Component = () => {
               />
             </Match>
             <Match when={currentView() === "subAgentViewer"}>
-              <ChatView readonly />
+              <ChatView readonly onBack={() => {
+                const stack = sessionStack()
+                const parent = stack[stack.length - 1]
+                setSessionStack((prev) => prev.slice(0, -1))
+                if (parent) {
+                  session.selectSession(parent)
+                }
+                setCurrentView("newTask")
+              }} />
             </Match>
           </Switch>
         }

@@ -148,6 +148,7 @@ function mapSSEEvent(event: any): ExtensionMessage | null {
           partID: syncData.partID,
         } as any
       case "session.created.1":
+        if (syncData.info?.parentID) return null
         return {
           type: "sessionCreated",
           session: sessionToWebview(syncData.info),
@@ -256,6 +257,7 @@ function mapSSEEvent(event: any): ExtensionMessage | null {
       } as any
 
     case "session.created":
+      if (event.properties?.info?.parentID) return null
       return {
         type: "sessionCreated",
         session: sessionToWebview(event.properties?.info),
@@ -707,12 +709,13 @@ async function handleAbort(msg: any) {
 
 async function handleLoadMessages(msg: any) {
   const sessionID = msg.sessionID
+  const mode = msg.mode === "focus" ? "reconcile" : (msg.mode ?? "replace")
   if (!sessionID || sessionID === "{sessionID}") {
     emitVsCodeMessage({
       type: "messagesLoaded",
       sessionID,
       messages: [],
-      mode: msg.mode ?? "replace",
+      mode,
       hasMore: false,
     } as any)
     return
@@ -744,7 +747,7 @@ async function handleLoadMessages(msg: any) {
       type: "messagesLoaded",
       sessionID,
       messages,
-      mode: msg.mode ?? "replace",
+      mode,
       cursor: cursor ?? undefined,
       hasMore: Boolean(cursor),
     } as any)
@@ -756,6 +759,13 @@ async function handleLoadMessages(msg: any) {
       sessionID,
     } as any)
   }
+}
+
+async function handleOpenSubAgentViewer(msg: any) {
+  const sessionID = msg.sessionID
+  if (!sessionID) return
+  emitVsCodeMessage({ type: "viewSubAgentSession", sessionID } as any)
+  await handleLoadMessages({ sessionID, mode: "replace" })
 }
 
 async function handleCreateSession() {
@@ -1446,6 +1456,13 @@ export function setupEmulator() {
               autoApproveEnabled = !autoApproveEnabled
               emitVsCodeMessage({ type: "autoApproveState", active: autoApproveEnabled } as any)
               break
+
+             case "streamSessionVisible":
+               break
+
+             case "openSubAgentViewer":
+               await handleOpenSubAgentViewer(msg)
+               break
 
              case "openSettingsPanel":
              case "openSettingsTab":
