@@ -30,6 +30,7 @@ import { formatCompactCount } from "../../utils/format"
 interface TaskHeaderProps {
   readonly?: boolean
   onBack?: () => void
+  onToggleDrawer?: () => void
 }
 
 export const TaskHeader: Component<TaskHeaderProps> = (props) => {
@@ -170,6 +171,16 @@ export const TaskHeader: Component<TaskHeaderProps> = (props) => {
     <Show when={hasMessages()}>
       <div data-component="task-header">
         <div data-slot="task-header-title">
+          <Show when={props.onToggleDrawer}>
+            <IconButton
+              icon="layout-left"
+              size="small"
+              variant="ghost"
+              onClick={props.onToggleDrawer}
+              aria-label="Toggle sessions"
+              class="session-drawer-mobile-toggle"
+            />
+          </Show>
           <Show when={props.onBack}>
             <IconButton
               icon="arrow-left"

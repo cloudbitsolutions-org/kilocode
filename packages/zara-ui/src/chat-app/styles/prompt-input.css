@@ -737,8 +737,8 @@
   .prompt-input-mobile-wrapper--collapsed .prompt-input-mobile-toggler {
     display: flex;
     position: absolute;
-    right: 0;
-    bottom: 20px;
+    right: -20px;
+    bottom: 100px;
     width: 24px;
     height: 64px;
     background-color: var(--input-base, var(--vscode-input-background, #3c3c3c));
@@ -762,5 +762,10 @@
 
   .prompt-input-mobile-collapse-btn {
     display: inline-flex !important;
+  }
+
+  .prompt-input,
+  .prompt-input-highlight-overlay {
+    font-size: 16px !important;
   }
 }

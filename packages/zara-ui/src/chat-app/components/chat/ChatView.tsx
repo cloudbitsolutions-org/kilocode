@@ -8,6 +8,7 @@
 import { type Component, type JSX, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js"
 import { Button } from "@kilocode/kilo-ui/button"
 import { Icon } from "@kilocode/kilo-ui/icon"
+import { IconButton } from "@kilocode/kilo-ui/icon-button"
 import { Spinner } from "@kilocode/kilo-ui/spinner"
 import { Tooltip } from "@kilocode/kilo-ui/tooltip"
 import { showToast } from "@kilocode/kilo-ui/toast"
@@ -327,7 +328,17 @@ export const ChatView: Component<ChatViewProps> = (props) => {
 
   return (
     <div class="chat-view">
-      <TaskHeader readonly={props.readonly} onBack={props.onBack} />
+      <Show when={props.onShowHistory}>
+        <IconButton
+          class="session-drawer-mobile-fab"
+          icon="layout-left"
+          size="small"
+          variant="ghost"
+          onClick={() => props.onShowHistory?.()}
+          aria-label="Sessions"
+        />
+      </Show>
+      <TaskHeader readonly={props.readonly} onBack={props.onBack} onToggleDrawer={props.onShowHistory} />
       <div class="chat-messages-wrapper">
         <div class="chat-messages">
           <Show

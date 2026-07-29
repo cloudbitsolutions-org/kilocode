@@ -35,6 +35,7 @@ registerExpandedTaskTool()
 // Apply VS Code sidebar preferences to other tools (e.g. bash expanded by default).
 registerVscodeToolOverrides()
 import HistoryView from "./components/history/HistoryView"
+import { SessionDrawer } from "./components/chat/SessionDrawer"
 import { MigrationWizard } from "./components/migration" // legacy-migration
 import { NotificationsProvider } from "./context/notifications"
 import { FeedbackProvider } from "./context/feedback"
@@ -237,9 +238,32 @@ const AppContent: Component = () => {
   // race conditions with SettingsEditorProvider's navigate messages.
   const [migrationNeeded, setMigrationNeeded] = createSignal(false)
   const [migrationSource, setMigrationSource] = createSignal<"legacy" | "roo">("legacy")
+  const [drawerOpen, setDrawerOpen] = createSignal(false)
+  const [drawerWidth, setDrawerWidth] = createSignal(240)
   const session = useSession()
   const server = useServer()
   const vscode = useVSCode()
+
+  let resizing = false
+  const onResizeStart = (e: MouseEvent) => {
+    e.preventDefault()
+    resizing = true
+    const handle = e.currentTarget as HTMLElement
+    handle.classList.add("dragging")
+    const move = (ev: MouseEvent) => {
+      if (!resizing) return
+      const width = Math.min(360, Math.max(180, ev.clientX))
+      setDrawerWidth(width)
+    }
+    const up = () => {
+      resizing = false
+      handle.classList.remove("dragging")
+      document.removeEventListener("mousemove", move)
+      document.removeEventListener("mouseup", up)
+    }
+    document.addEventListener("mousemove", move)
+    document.addEventListener("mouseup", up)
+  }
 
   const handleViewAction = (action: string) => {
     switch (action) {
@@ -339,73 +363,106 @@ const AppContent: Component = () => {
     <SidebarEmptyState onSelectSession={handleSelectSession} onShowHistory={() => setCurrentView("history")} />
   )
 
+  const isChatView = () => {
+    const view = currentView()
+    return view === "newTask" || view === "subAgentViewer"
+  }
+
+  const handleDrawerSelect = (id: string) => {
+    handleSelectSession(id)
+    setDrawerOpen(false)
+  }
+
+  const handleDrawerNew = () => {
+    window.dispatchEvent(new CustomEvent("newTaskRequest"))
+    setCurrentView("newTask")
+  }
+
   return (
-    <div class="container">
-      {/* legacy-migration start — state-driven overlay, independent of currentView */}
-      <Show
-        when={migrationNeeded()}
-        fallback={
-          <Switch
-            fallback={
-              <ChatView
-                continueInWorktree
-                onForkMessage={session.status() === "idle" ? handleForkMessage : undefined}
-                promptBoxId="sidebar:fallback"
-                emptyState={emptyState}
-              />
-            }
-          >
-            <Match when={currentView() === "newTask"}>
-              <ChatView
-                onSelectSession={handleSelectSession}
-                onShowHistory={() => setCurrentView("history")}
-                onForkMessage={session.status() === "idle" ? handleForkMessage : undefined}
-                continueInWorktree
-                promptBoxId="sidebar:new-task"
-                emptyState={emptyState}
-              />
-            </Match>
-            <Match when={currentView() === "history"}>
-              <HistoryView onSelectSession={handleSelectSession} onBack={() => setCurrentView("newTask")} />
-            </Match>
-            <Match when={currentView() === "profile"}>
-              <ProfileView
-                profileData={server.profileData()}
-                deviceAuth={server.deviceAuth()}
-                onLogin={server.startLogin}
-              />
-            </Match>
-            <Match when={currentView() === "settings"}>
-              <Settings
-                tab={settingsTab()}
-                onTabChange={setSettingsTab}
-                onMigrationClick={(source) => {
-                  setMigrationSource(source)
-                  setMigrationNeeded(true)
-                }}
-              />
-            </Match>
-            <Match when={currentView() === "subAgentViewer"}>
-              <ChatView readonly onBack={() => {
-                const stack = sessionStack()
-                const parent = stack[stack.length - 1]
-                setSessionStack((prev) => prev.slice(0, -1))
-                if (parent) {
-                  session.selectSession(parent)
-                }
-                setCurrentView("newTask")
-              }} />
-            </Match>
-          </Switch>
-        }
-      >
-        <MigrationWizard
-          source={migrationSource()}
-          onBack={() => setMigrationNeeded(false)}
-          onComplete={() => setMigrationNeeded(false)}
+    <div class="session-drawer-layout">
+      <Show when={isChatView() && !migrationNeeded()}>
+        <SessionDrawer
+          open={drawerOpen()}
+          onClose={() => setDrawerOpen(false)}
+          onSelectSession={handleDrawerSelect}
+          onNewSession={handleDrawerNew}
+          width={drawerWidth()}
+        />
+        <div
+          class="session-drawer-resize"
+          onMouseDown={onResizeStart}
         />
       </Show>
-      {/* legacy-migration end */}
+      <div class="session-drawer-main">
+        <div class="container">
+          {/* legacy-migration start — state-driven overlay, independent of currentView */}
+          <Show
+            when={migrationNeeded()}
+            fallback={
+              <Switch
+                fallback={
+                  <ChatView
+                    continueInWorktree
+                    onForkMessage={session.status() === "idle" ? handleForkMessage : undefined}
+                    promptBoxId="sidebar:fallback"
+                    emptyState={emptyState}
+                    onShowHistory={() => setDrawerOpen((v) => !v)}
+                  />
+                }
+              >
+                <Match when={currentView() === "newTask"}>
+                  <ChatView
+                    onSelectSession={handleSelectSession}
+                    onShowHistory={() => setDrawerOpen((v) => !v)}
+                    onForkMessage={session.status() === "idle" ? handleForkMessage : undefined}
+                    continueInWorktree
+                    promptBoxId="sidebar:new-task"
+                    emptyState={emptyState}
+                  />
+                </Match>
+                <Match when={currentView() === "history"}>
+                  <HistoryView onSelectSession={handleSelectSession} onBack={() => setCurrentView("newTask")} />
+                </Match>
+                <Match when={currentView() === "profile"}>
+                  <ProfileView
+                    profileData={server.profileData()}
+                    deviceAuth={server.deviceAuth()}
+                    onLogin={server.startLogin}
+                  />
+                </Match>
+                <Match when={currentView() === "settings"}>
+                  <Settings
+                    tab={settingsTab()}
+                    onTabChange={setSettingsTab}
+                    onMigrationClick={(source) => {
+                      setMigrationSource(source)
+                      setMigrationNeeded(true)
+                    }}
+                  />
+                </Match>
+                <Match when={currentView() === "subAgentViewer"}>
+                  <ChatView readonly onBack={() => {
+                    const stack = sessionStack()
+                    const parent = stack[stack.length - 1]
+                    setSessionStack((prev) => prev.slice(0, -1))
+                    if (parent) {
+                      session.selectSession(parent)
+                    }
+                    setCurrentView("newTask")
+                  }} />
+                </Match>
+              </Switch>
+            }
+          >
+            <MigrationWizard
+              source={migrationSource()}
+              onBack={() => setMigrationNeeded(false)}
+              onComplete={() => setMigrationNeeded(false)}
+            />
+          </Show>
+          {/* legacy-migration end */}
+        </div>
+      </div>
     </div>
   )
 }
