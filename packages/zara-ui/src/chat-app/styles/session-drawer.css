@@ -150,12 +150,12 @@
 }
 
 /* ── Mobile toggle button (inside TaskHeader, when messages exist) ── */
-.session-drawer-mobile-toggle {
+.session-drawer-mobile-toggle[data-component="icon-button"] {
   display: none;
 }
 
 /* ── Mobile floating toggle (always visible, top-left of chat view) ── */
-.session-drawer-mobile-fab {
+.session-drawer-mobile-fab[data-component="icon-button"] {
   display: none;
 }
 
@@ -200,33 +200,19 @@
     to { opacity: 1; }
   }
 
-  .session-drawer-mobile-toggle {
+  .session-drawer-mobile-toggle[data-component="icon-button"] {
     display: inline-flex;
   }
 
-  .session-drawer-mobile-fab {
+  .session-drawer-mobile-fab[data-component="icon-button"] {
     display: flex;
-    align-items: center;
-    justify-content: center;
     position: absolute;
     top: 8px;
     left: 8px;
     z-index: 50;
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    border: none;
-    background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.2));
-    color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
-    cursor: pointer;
-    transition: background 0.15s;
   }
 
-  .session-drawer-mobile-fab:hover {
-    background: var(--vscode-button-secondaryHoverBackground, rgba(128, 128, 128, 0.3));
-  }
-
-  .chat-view:has([data-component="task-header"]) .session-drawer-mobile-fab {
+  .chat-view:has([data-component="task-header"]) .session-drawer-mobile-fab[data-component="icon-button"] {
     display: none;
   }
 }
