@@ -165,7 +165,10 @@ export const MessageList: Component<MessageListProps> = (props) => {
   const onScrollToMessage = (e: Event) => {
     const detail = (e as CustomEvent<{ id: string; partId?: string }>).detail
     if (!detail?.id) return
-    const matches = rows().filter((r) => r.type === "assistant" && r.message.id === detail.id)
+    let matches = rows().filter((r) => r.type === "assistant" && r.message.id === detail.id)
+    if (matches.length === 0) {
+      matches = rows().filter((r) => r.message.id === detail.id)
+    }
     // Long messages split into multiple rows (chunks); land on the chunk that
     // actually contains the clicked part, not just the message's first chunk.
     const row = matches.find((r) => r.type === "assistant" && r.parts.some((p) => p.id === detail.partId)) ?? matches[0]

@@ -142,6 +142,7 @@ interface SessionContextValue {
   statusText: Accessor<string | undefined>
   busySince: Accessor<number | undefined>
   submitting: Accessor<boolean>
+  isSubmitting: (id: string) => boolean
   loading: Accessor<boolean>
   loadingOlderMessages: Accessor<boolean>
   hasOlderMessages: Accessor<boolean>
@@ -351,9 +352,12 @@ export const SessionProvider: ParentComponent = (props) => {
     const id = currentSessionID() ?? draftSessionID()
     return id ? busySinceMap[id] : undefined
   }
+  const isSubmitting = (id: string) => {
+    return (submissionMap[id] ?? 0) > 0
+  }
   const submitting = () => {
     const id = currentSessionID() ?? draftSessionID()
-    return id ? (submissionMap[id] ?? 0) > 0 : false
+    return id ? isSubmitting(id) : false
   }
 
   const [loading, setLoading] = createSignal(false)
@@ -1709,7 +1713,12 @@ export const SessionProvider: ParentComponent = (props) => {
   }
 
   function handlePermissionRequest(permission: PermissionRequest) {
-    setPermissions((prev) => upsertPermission(prev, permission))
+    console.log("[session.tsx] Received permission request:", permission)
+    setPermissions((prev) => {
+      const next = upsertPermission(prev, permission)
+      console.log("[session.tsx] New permissions state:", next)
+      return next
+    })
   }
 
   function handlePermissionResolved(permissionID: string) {
@@ -2875,6 +2884,7 @@ export const SessionProvider: ParentComponent = (props) => {
     statusText,
     busySince,
     submitting,
+    isSubmitting,
     loading,
     loadingOlderMessages,
     hasOlderMessages,

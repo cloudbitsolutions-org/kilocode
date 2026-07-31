@@ -6,6 +6,8 @@
  */
 
 @import "./session-title-editor.css";
+@import "./session-tabs.css";
+@import "./chat-message-nav.css";
 @import "./task-header.css";
 @import "./chat-layout.css";
 @import "./banners.css";

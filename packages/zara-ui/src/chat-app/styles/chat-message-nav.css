@@ -1,0 +1,24 @@
+.chat-message-nav-rail {
+  position: absolute;
+  left: 4px;
+  top: 0;
+  bottom: 0;
+  z-index: 10;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+}
+
+.chat-message-nav-rail > * {
+  pointer-events: auto;
+}
+
+/* Hide diff bar icons in the message nav popover */
+[data-slot="message-nav-hovercard-content"] [data-component="diff-changes"] {
+  display: none !important;
+}
+
+/* Ensure the popover renders above the sidebar */
+[data-slot="message-nav-hovercard-content"] {
+  z-index: 9999 !important;
+}

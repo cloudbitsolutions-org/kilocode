@@ -263,7 +263,7 @@ export const layer: Layer.Layer<
         const global = yield* config.getGlobal()
         const indexing = KiloToolRegistry.indexing(cfg, global)
         // kilocode_change end
-        const questionEnabled = ["app", "cli", "desktop", "vscode"].includes(flags.client) || flags.enableQuestionTool // kilocode_change: add vscode client
+        const questionEnabled = ["app", "cli", "desktop", "vscode", "zara", "web"].includes(flags.client) || flags.enableQuestionTool // kilocode_change: add vscode client
 
         const tool = yield* Effect.all({
           invalid: Tool.init(invalid),
@@ -316,7 +316,7 @@ export const layer: Layer.Layer<
               tool.skill,
               tool.patch,
               tool.plan,
-              ...(["cli", "vscode"].includes(flags.client) ? [tool.suggest] : []),
+              ...(["cli", "vscode", "zara", "web"].includes(flags.client) ? [tool.suggest] : []),
               ...KiloToolRegistry.extra(kilo, cfg),
               ...(flags.experimentalLspTool ? [tool.lsp] : []),
             ],

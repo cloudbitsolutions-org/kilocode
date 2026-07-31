@@ -287,6 +287,7 @@ function mapSSEEvent(event: any): ExtensionMessage | null {
 
     case "permission.asked": {
       const props = event.properties
+      console.log("[Emulator] Mapped permission.asked:", props)
       if (!props) return null
       return {
         type: "permissionRequest",
@@ -362,11 +363,10 @@ function mapSSEEvent(event: any): ExtensionMessage | null {
       } as any
 
     case "session.error":
-      return {
-        type: "sessionError",
-        sessionID: event.properties?.sessionID,
-        error: event.properties?.error,
-      } as any
+      // The VS Code extension ignores session.error events entirely, relying on
+      // synthetic text messages sent to the LLM to handle tool/attachment failures.
+      // We do the same here to prevent red error boxes in the chat UI.
+      return null
 
     case "indexing.status":
       return {
@@ -751,6 +751,50 @@ async function handleLoadMessages(msg: any) {
       cursor: cursor ?? undefined,
       hasMore: Boolean(cursor),
     } as any)
+
+    // Load pending permissions
+    try {
+      const { data: perms } = await client.permission.list({ directory }, { throwOnError: true })
+      if (perms) {
+        for (const perm of perms as any[]) {
+          emitVsCodeMessage({
+            type: "permissionRequest",
+            permission: {
+              id: perm.id,
+              sessionID: perm.sessionID,
+              toolName: perm.permission,
+              patterns: perm.patterns,
+              always: perm.always,
+              args: perm.metadata,
+              message: `Permission required: ${perm.permission}`,
+              tool: perm.tool,
+            },
+          } as any)
+        }
+      }
+    } catch (e) {
+      console.error("[Emulator] Failed to fetch pending permissions:", e)
+    }
+
+    // Load pending questions
+    try {
+      const { data: qs } = await client.question.list({ directory }, { throwOnError: true })
+      if (qs) {
+        for (const q of qs as any[]) {
+          emitVsCodeMessage({
+            type: "questionRequest",
+            question: {
+              id: q.id,
+              sessionID: q.sessionID,
+              questions: q.questions,
+              tool: q.tool,
+            },
+          } as any)
+        }
+      }
+    } catch (e) {
+      console.error("[Emulator] Failed to fetch pending questions:", e)
+    }
   } catch (e) {
     console.error("[Emulator] Failed to load messages:", e)
     emitVsCodeMessage({
@@ -824,7 +868,7 @@ async function handlePermissionResponse(msg: any) {
 async function handleQuestionReply(msg: any) {
   try {
     await client.question.reply({
-      id: msg.requestID,
+      requestID: msg.requestID,
       directory,
       answers: msg.answers,
     } as any)
@@ -836,7 +880,7 @@ async function handleQuestionReply(msg: any) {
 async function handleQuestionReject(msg: any) {
   try {
     await client.question.reject({
-      id: msg.requestID,
+      requestID: msg.requestID,
       directory,
     } as any)
   } catch (e) {

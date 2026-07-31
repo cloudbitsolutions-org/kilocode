@@ -14,6 +14,8 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
+    "@kobalte/core": "0.13.11",
+    "@thisbeyond/solid-dnd": "0.7.5",
     "@kilocode/kilo-i18n": "workspace:*",
     "@kilocode/kilo-indexing": "workspace:*",
     "@kilocode/kilo-memory": "workspace:*",

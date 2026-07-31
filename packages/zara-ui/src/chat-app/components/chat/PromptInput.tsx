@@ -1242,7 +1242,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   when={file.mime.startsWith("image/")}
                   fallback={
                     <div class="file-attachment-pill" style={{ display: "flex", "align-items": "center", gap: "4px", padding: "4px 8px", background: "var(--kilo-bg-tertiary)", "border-radius": "4px", color: "var(--kilo-fg-primary)" }}>
-                      <FileIcon />
+                      <FileIcon node={{ path: file.filename || "file", type: "file" }} />
                       <span style={{ "max-width": "120px", overflow: "hidden", "text-overflow": "ellipsis", "white-space": "nowrap", "font-size": "12px" }}>{file.filename}</span>
                     </div>
                   }
@@ -1480,7 +1480,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
             variant="ghost"
             size="small"
             class="prompt-input-mobile-collapse-btn"
-            onClick={(e) => {
+            onClick={(e: MouseEvent) => {
               e.preventDefault()
               e.stopPropagation()
               setIsMobileCollapsed(true)

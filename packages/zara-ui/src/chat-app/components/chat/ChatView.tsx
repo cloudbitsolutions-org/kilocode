@@ -15,10 +15,13 @@ import { showToast } from "@kilocode/kilo-ui/toast"
 import { DropdownMenu } from "@kilocode/kilo-ui/dropdown-menu"
 import { TaskHeader } from "./TaskHeader"
 import { MessageList } from "./MessageList"
+import { ChatMessageNav } from "./ChatMessageNav"
+import type { UserMessage } from "@kilocode/sdk/v2"
 import { AgentRequirements } from "./AgentRequirements"
 import { PromptInput } from "./PromptInput"
 import { PermissionDock } from "./PermissionDock"
 import { StartupErrorBanner } from "./StartupErrorBanner"
+import { SessionTabStrip } from "./SessionTabStrip"
 import { useSession } from "../../context/session"
 import { useVSCode } from "../../context/vscode"
 import { useLanguage } from "../../context/language"
@@ -326,7 +329,11 @@ export const ChatView: Component<ChatViewProps> = (props) => {
     </Show>
   )
 
-  return (
+  const userMessages = createMemo(() => session.visibleMessages().filter((m) => m.role === "user") as UserMessage[])
+
+  const hasUserMessages = createMemo(() => userMessages().length > 0)
+
+   return (
     <div class="chat-view">
       <Show when={props.onShowHistory}>
         <IconButton
@@ -338,7 +345,16 @@ export const ChatView: Component<ChatViewProps> = (props) => {
           aria-label="Sessions"
         />
       </Show>
+      <SessionTabStrip />
       <TaskHeader readonly={props.readonly} onBack={props.onBack} onToggleDrawer={props.onShowHistory} />
+      <Show when={hasUserMessages()}>
+        <div class="chat-message-nav-rail">
+          <ChatMessageNav
+            messages={userMessages()}
+            onMessageSelect={(m) => window.dispatchEvent(new CustomEvent("scrollToMessage", { detail: { id: m.id } }))}
+          />
+        </div>
+      </Show>
       <div class="chat-messages-wrapper">
         <div class="chat-messages">
           <Show

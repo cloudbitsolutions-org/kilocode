@@ -22,6 +22,7 @@ import { IndexingProvider } from "./context/indexing"
 import { AgentRequirementsProvider } from "./context/agent-requirements"
 import { MemoryProvider } from "./context/memory"
 import { SessionProvider, useSession } from "./context/session"
+import { LocalTabsProvider, useLocalTabs } from "./context/local-tabs"
 import { LanguageBridge } from "./context/language-bridge"
 import { ChatView } from "./components/chat"
 import { SidebarEmptyState } from "./components/chat/SidebarEmptyState"
@@ -241,6 +242,7 @@ const AppContent: Component = () => {
   const [drawerOpen, setDrawerOpen] = createSignal(false)
   const [drawerWidth, setDrawerWidth] = createSignal(240)
   const session = useSession()
+  const tabs = useLocalTabs()
   const server = useServer()
   const vscode = useVSCode()
 
@@ -268,7 +270,10 @@ const AppContent: Component = () => {
   const handleViewAction = (action: string) => {
     switch (action) {
       case "plusButtonClicked":
-        window.dispatchEvent(new CustomEvent("newTaskRequest"))
+        const chat = currentView() === "newTask"
+        if (chat) window.dispatchEvent(new CustomEvent("newTaskRequest"))
+        if (!chat && tabs) tabs.add()
+        if (!chat && !tabs) session.clearCurrentSession()
         setCurrentView("newTask")
         break
       case "historyButtonClicked":
@@ -300,9 +305,11 @@ const AppContent: Component = () => {
     if (agent) session.selectAgent(agent.name)
   }
 
-  const handleForked = (message: { type?: string; sessionID?: string }) => {
+  const handleForked = (message: { type?: string; sessionID?: string; forkedFromID?: string }) => {
     if (message.type !== "sessionForked" || !message.sessionID) return
-    session.selectSession(message.sessionID)
+    if (tabs && message.forkedFromID) tabs.openAfter(message.forkedFromID, message.sessionID)
+    if (tabs && !message.forkedFromID) tabs.open(message.sessionID)
+    if (!tabs) session.selectSession(message.sessionID)
     setCurrentView("newTask")
   }
 
@@ -351,7 +358,8 @@ const AppContent: Component = () => {
   })
 
   const handleSelectSession = (id: string) => {
-    session.selectSession(id)
+    if (tabs) tabs.open(id)
+    if (!tabs) session.selectSession(id)
     setCurrentView("newTask")
   }
 
@@ -490,15 +498,17 @@ const App: Component = () => {
                                   <ImageModelsProvider>
                                     <NotificationsProvider>
                                       <SessionProvider>
-                                        <AgentRequirementsProvider>
-                                          <MemoryProvider>
-                                            <FeedbackProvider>
-                                              <DataBridge>
-                                                <AppContent />
-                                              </DataBridge>
-                                            </FeedbackProvider>
-                                          </MemoryProvider>
-                                        </AgentRequirementsProvider>
+                                        <LocalTabsProvider>
+                                          <AgentRequirementsProvider>
+                                            <MemoryProvider>
+                                              <FeedbackProvider>
+                                                <DataBridge>
+                                                  <AppContent />
+                                                </DataBridge>
+                                              </FeedbackProvider>
+                                            </MemoryProvider>
+                                          </AgentRequirementsProvider>
+                                        </LocalTabsProvider>
                                       </SessionProvider>
                                     </NotificationsProvider>
                                   </ImageModelsProvider>
