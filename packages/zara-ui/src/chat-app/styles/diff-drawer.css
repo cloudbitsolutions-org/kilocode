@@ -1,0 +1,235 @@
+.diff-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 998;
+  background: rgba(0, 0, 0, 0.4);
+  animation: diff-drawer-fade 0.15s ease;
+}
+
+@keyframes diff-drawer-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.diff-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  background: var(--background-base, #1a1a1c);
+  border-left: 1px solid var(--border-weak-base, rgba(255,255,255,0.08));
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3);
+  animation: diff-drawer-slide 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.diff-drawer--dragging {
+  user-select: none;
+  transition: none !important;
+}
+
+@keyframes diff-drawer-slide {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+/* ── Drag handle ── */
+
+.diff-drawer-handle {
+  position: absolute;
+  left: -6px;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  cursor: col-resize;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.diff-drawer-handle:hover .diff-drawer-handle-bar,
+.diff-drawer--dragging .diff-drawer-handle-bar {
+  background: var(--border-strong-base, #4a9eff);
+  opacity: 1;
+}
+
+.diff-drawer-handle-bar {
+  width: 3px;
+  height: 48px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.15);
+  opacity: 0.6;
+  transition: background 0.12s, opacity 0.12s;
+}
+
+/* ── Header ── */
+
+.diff-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-weak-base, rgba(255,255,255,0.08));
+  flex-shrink: 0;
+  gap: 12px;
+}
+
+.diff-drawer-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.diff-drawer-filename {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-strong, #e0e0e0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.diff-drawer-stat {
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-mono, monospace);
+  flex-shrink: 0;
+}
+
+.diff-drawer-stat--add {
+  color: #3fb950;
+}
+
+.diff-drawer-stat--del {
+  color: #f85149;
+}
+
+/* ── Content ── */
+
+.diff-drawer-content {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+.diff-drawer-patch {
+  margin: 0;
+  padding: 12px 0;
+  font-size: 12px;
+  line-height: 1.6;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  white-space: pre;
+  tab-size: 4;
+}
+
+.diff-line {
+  padding: 0 16px;
+  color: var(--text-base, #ccc);
+}
+
+.diff-line-add {
+  padding: 0 16px;
+  color: #3fb950;
+  background: rgba(63, 185, 80, 0.1);
+}
+
+.diff-line-del {
+  padding: 0 16px;
+  color: #f85149;
+  background: rgba(248, 81, 73, 0.1);
+}
+
+.diff-line-hunk {
+  padding: 4px 16px;
+  color: rgba(255, 255, 255, 0.4);
+  background: rgba(56, 139, 253, 0.08);
+  font-style: italic;
+}
+
+.diff-drawer-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--text-weak, #777);
+  font-size: 13px;
+}
+
+/* ── File Drawer extras ── */
+
+.file-drawer-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.file-drawer-line {
+  font-size: 12px;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-weak, #888);
+}
+
+.file-drawer-path {
+  padding: 4px 16px 8px;
+  font-size: 11px;
+  color: var(--text-weak, #666);
+  font-family: var(--font-mono, monospace);
+  border-bottom: 1px solid var(--border-weak-base, rgba(255,255,255,0.06));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-drawer-code {
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1.65;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  white-space: pre;
+  tab-size: 4;
+  counter-reset: line;
+}
+
+.file-line {
+  display: flex;
+  min-height: 20px;
+  padding: 0 16px 0 0;
+}
+
+.file-line--active {
+  background: rgba(56, 139, 253, 0.15);
+  border-left: 3px solid #388bfd;
+  padding-left: 0;
+}
+
+.file-line:not(.file-line--active) {
+  padding-left: 3px;
+}
+
+.file-line-num {
+  display: inline-block;
+  width: 48px;
+  min-width: 48px;
+  text-align: right;
+  padding-right: 16px;
+  color: rgba(255, 255, 255, 0.2);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.file-line--active .file-line-num {
+  color: rgba(56, 139, 253, 0.7);
+}
+
+.file-line-text {
+  color: var(--text-base, #ccc);
+  flex: 1;
+  min-width: 0;
+}

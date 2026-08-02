@@ -1276,6 +1276,9 @@ export function setupEmulator() {
             case "openContent":
             case "saveImage":
             case "validateFiles":
+              if (msg.type === "openFile" && msg.filePath) {
+                window.dispatchEvent(new CustomEvent("openFileDrawer", { detail: { filePath: msg.filePath, line: msg.line, column: msg.column } }))
+              }
               if (msg.type === "openExternal" && msg.url) {
                 window.open(msg.url, "_blank")
               }

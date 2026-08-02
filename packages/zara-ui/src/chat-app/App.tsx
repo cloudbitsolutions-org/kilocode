@@ -10,6 +10,9 @@ import { Diff } from "@kilocode/kilo-ui/diff"
 import { File } from "@kilocode/kilo-ui/file"
 import { DataProvider } from "@kilocode/kilo-ui/context/data"
 import { Toast } from "@kilocode/kilo-ui/toast"
+import { DiffDrawer, type DiffDrawerData } from "./components/chat/DiffDrawer"
+import { FileDrawer, type FileDrawerData } from "./components/chat/FileDrawer"
+import { ContentDrawer } from "./components/chat/ContentDrawer"
 import Settings from "./components/settings/Settings"
 import ProfileView from "./components/profile/ProfileView"
 import { VSCodeProvider, useVSCode } from "./context/vscode"
@@ -140,11 +143,11 @@ export const DataBridge: Component<{ children: any }> = (props) => {
   }
 
   const open = (filePath: string, line?: number, column?: number) => {
-    vscode.postMessage({ type: "openFile", filePath, line, column })
+    window.dispatchEvent(new CustomEvent("openFileDrawer", { detail: { filePath, line, column } }))
   }
 
   const openDiff = (diff: { file: string; patch?: string; additions: number; deletions: number }) => {
-    vscode.postMessage({ type: "openDiffVirtual", diff, initialDiffStyle: "split" })
+    window.dispatchEvent(new CustomEvent("openDiffDrawer", { detail: { ...diff, style: "split" } }))
   }
 
   const openUrl = (url: string) => {
@@ -152,7 +155,7 @@ export const DataBridge: Component<{ children: any }> = (props) => {
   }
 
   const openContent = (content: string, language?: string) => {
-    vscode.postMessage({ type: "openContent", content, language })
+    window.dispatchEvent(new CustomEvent("openContentDrawer", { detail: { content, language } }))
   }
 
   // File existence validation for code span candidates
@@ -241,6 +244,23 @@ const AppContent: Component = () => {
   const [migrationSource, setMigrationSource] = createSignal<"legacy" | "roo">("legacy")
   const [drawerOpen, setDrawerOpen] = createSignal(false)
   const [drawerWidth, setDrawerWidth] = createSignal(240)
+  const [diffDrawer, setDiffDrawer] = createSignal<DiffDrawerData | null>(null)
+  const [fileDrawer, setFileDrawer] = createSignal<FileDrawerData | null>(null)
+  const [contentDrawer, setContentDrawer] = createSignal<{ content: string; language?: string } | null>(null)
+
+  onMount(() => {
+    const diffHandler = (e: Event) => setDiffDrawer((e as CustomEvent).detail)
+    const fileHandler = (e: Event) => setFileDrawer((e as CustomEvent).detail)
+    const contentHandler = (e: Event) => setContentDrawer((e as CustomEvent).detail)
+    window.addEventListener("openDiffDrawer", diffHandler)
+    window.addEventListener("openFileDrawer", fileHandler)
+    window.addEventListener("openContentDrawer", contentHandler)
+    onCleanup(() => {
+      window.removeEventListener("openDiffDrawer", diffHandler)
+      window.removeEventListener("openFileDrawer", fileHandler)
+      window.removeEventListener("openContentDrawer", contentHandler)
+    })
+  })
   const session = useSession()
   const tabs = useLocalTabs()
   const server = useServer()
@@ -471,6 +491,15 @@ const AppContent: Component = () => {
           {/* legacy-migration end */}
         </div>
       </div>
+      <Show when={diffDrawer()}>
+        {(data) => <DiffDrawer data={data()} onClose={() => setDiffDrawer(null)} />}
+      </Show>
+      <Show when={fileDrawer()}>
+        {(data) => <FileDrawer data={data()} directory={server.workspaceDirectory() ?? ""} onClose={() => setFileDrawer(null)} />}
+      </Show>
+      <Show when={contentDrawer()}>
+        {(data) => <ContentDrawer content={data().content} language={data().language} onClose={() => setContentDrawer(null)} />}
+      </Show>
     </div>
   )
 }
