@@ -1,8 +1,9 @@
 /** @jsxImportSource solid-js */
-import { type Component, Show, createSignal, createResource, onMount, onCleanup } from "solid-js"
+import { type Component, Show, Switch, Match, createSignal, createMemo, createResource, onMount, onCleanup } from "solid-js"
 import { Icon } from "@kilocode/kilo-ui/icon"
 import { IconButton } from "@kilocode/kilo-ui/icon-button"
 import { Button } from "@kilocode/kilo-ui/button"
+import { Markdown } from "@kilocode/kilo-ui/markdown"
 
 export interface FileDrawerData {
   filePath: string
@@ -10,21 +11,67 @@ export interface FileDrawerData {
   column?: number
 }
 
+interface FileResult {
+  content: string
+  type: string
+  mimeType?: string
+  encoding?: string
+}
+
 function getApiBase() {
   const params = new URLSearchParams(window.location.search)
   return params.get("url") || window.location.origin
 }
 
-async function fetchFile(path: string, directory: string): Promise<{ content: string; type: string }> {
+async function fetchFile(path: string, directory: string): Promise<FileResult> {
   const base = getApiBase()
   const token = btoa("kilo:kilo")
   const params = new URLSearchParams({ path, directory })
-  const res = await fetch(`${base}/v1/file?${params}`, {
+  const res = await fetch(`${base}/file/content?${params}`, {
     headers: { Authorization: `Basic ${token}` },
   })
   if (!res.ok) throw new Error(`Failed to read file: ${res.status}`)
   const data = await res.json()
-  return { content: data.content ?? "", type: data.type ?? "text" }
+  return {
+    content: data.content ?? "",
+    type: data.type ?? "text",
+    mimeType: data.mimeType,
+    encoding: data.encoding,
+  }
+}
+
+const IMG_EXT = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp", "avif"])
+const VIDEO_EXT = new Set(["mp4", "webm", "ogg", "mov"])
+const AUDIO_EXT = new Set(["mp3", "wav", "ogg", "flac", "aac", "m4a"])
+const PDF_EXT = new Set(["pdf"])
+const CSV_EXT = new Set(["csv", "tsv"])
+
+function CsvTable(props: { content: string; separator?: string }) {
+  const rows = createMemo(() => {
+    const sep = props.separator ?? (props.content.includes("\t") ? "\t" : ",")
+    return props.content.split("\n").filter(r => r.trim()).map(r => r.split(sep))
+  })
+
+  return (
+    <div class="file-drawer-csv">
+      <table>
+        <Show when={rows().length > 0}>
+          <thead>
+            <tr>
+              {rows()[0].map(cell => <th>{cell.trim()}</th>)}
+            </tr>
+          </thead>
+        </Show>
+        <tbody>
+          {rows().slice(1).map(row => (
+            <tr>
+              {row.map(cell => <td>{cell.trim()}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
 }
 
 export const FileDrawer: Component<{
@@ -87,13 +134,29 @@ export const FileDrawer: Component<{
   const ext = () => {
     const name = filename()
     const dot = name.lastIndexOf(".")
-    return dot > 0 ? name.slice(dot + 1) : ""
+    return dot > 0 ? name.slice(dot + 1).toLowerCase() : ""
   }
 
+  const kind = createMemo(() => {
+    const e = ext()
+    if (e === "md" || e === "mdx") return "markdown"
+    if (IMG_EXT.has(e)) return "image"
+    if (VIDEO_EXT.has(e)) return "video"
+    if (AUDIO_EXT.has(e)) return "audio"
+    if (PDF_EXT.has(e)) return "pdf"
+    if (CSV_EXT.has(e)) return "csv"
+    return "code"
+  })
+
+  const dataUrl = createMemo(() => {
+    const f = file()
+    if (!f || f.type !== "binary") return undefined
+    const mime = f.mimeType || "application/octet-stream"
+    return `data:${mime};base64,${f.content}`
+  })
+
   const openInNewTab = () => {
-    const base = window.location.origin
-    const path = encodeURIComponent(props.data.filePath)
-    window.open(`${base}/editor?file=${path}`, "_blank")
+    window.parent.postMessage({ type: "openFileInEditor", filePath: props.data.filePath, line: props.data.line }, "*")
   }
 
   return (
@@ -143,22 +206,57 @@ export const FileDrawer: Component<{
             {(f) => {
               setTimeout(scrollToLine, 50)
               return (
-                <pre ref={contentRef} class="file-drawer-code" data-ext={ext()}>
-                  {f().content.split("\n").map((line, i) => {
-                    const num = i + 1
-                    const active = num === props.data.line
-                    return (
-                      <div
-                        class="file-line"
-                        classList={{ "file-line--active": active }}
-                        data-line={num}
-                      >
-                        <span class="file-line-num">{num}</span>
-                        <span class="file-line-text">{line}</span>
-                      </div>
-                    )
-                  })}
-                </pre>
+                <Switch fallback={
+                  <pre ref={contentRef} class="file-drawer-code" data-ext={ext()}>
+                    {f().content.split("\n").map((line, i) => {
+                      const num = i + 1
+                      const active = num === props.data.line
+                      return (
+                        <div
+                          class="file-line"
+                          classList={{ "file-line--active": active }}
+                          data-line={num}
+                        >
+                          <span class="file-line-num">{num}</span>
+                          <span class="file-line-text">{line}</span>
+                        </div>
+                      )
+                    })}
+                  </pre>
+                }>
+                  <Match when={kind() === "markdown"}>
+                    <div class="file-drawer-markdown">
+                      <Markdown text={f().content} />
+                    </div>
+                  </Match>
+                  <Match when={kind() === "image" && (dataUrl() || (f().type === "text" && ext() === "svg"))}>
+                    <div class="file-drawer-media">
+                      <Show when={ext() === "svg" && f().type === "text"} fallback={
+                        <img src={dataUrl()} alt={filename()} />
+                      }>
+                        <div innerHTML={f().content} />
+                      </Show>
+                    </div>
+                  </Match>
+                  <Match when={kind() === "video" && dataUrl()}>
+                    <div class="file-drawer-media">
+                      <video controls src={dataUrl()} />
+                    </div>
+                  </Match>
+                  <Match when={kind() === "audio" && dataUrl()}>
+                    <div class="file-drawer-media">
+                      <audio controls src={dataUrl()} />
+                    </div>
+                  </Match>
+                  <Match when={kind() === "pdf" && dataUrl()}>
+                    <div class="file-drawer-media file-drawer-pdf">
+                      <iframe src={dataUrl()} title={filename()} />
+                    </div>
+                  </Match>
+                  <Match when={kind() === "csv"}>
+                    <CsvTable content={f().content} separator={ext() === "tsv" ? "\t" : ","} />
+                  </Match>
+                </Switch>
               )
             }}
           </Show>

@@ -13,6 +13,7 @@ import { Toast } from "@kilocode/kilo-ui/toast"
 import { DiffDrawer, type DiffDrawerData } from "./components/chat/DiffDrawer"
 import { FileDrawer, type FileDrawerData } from "./components/chat/FileDrawer"
 import { ContentDrawer } from "./components/chat/ContentDrawer"
+import { InteractiveTerminalDrawer, type InteractiveTerminalInfo } from "./components/chat/InteractiveTerminalDrawer"
 import Settings from "./components/settings/Settings"
 import ProfileView from "./components/profile/ProfileView"
 import { VSCodeProvider, useVSCode } from "./context/vscode"
@@ -247,18 +248,28 @@ const AppContent: Component = () => {
   const [diffDrawer, setDiffDrawer] = createSignal<DiffDrawerData | null>(null)
   const [fileDrawer, setFileDrawer] = createSignal<FileDrawerData | null>(null)
   const [contentDrawer, setContentDrawer] = createSignal<{ content: string; language?: string } | null>(null)
+  const [activeTerminal, setActiveTerminal] = createSignal<InteractiveTerminalInfo | null>(null)
 
   onMount(() => {
     const diffHandler = (e: Event) => setDiffDrawer((e as CustomEvent).detail)
     const fileHandler = (e: Event) => setFileDrawer((e as CustomEvent).detail)
     const contentHandler = (e: Event) => setContentDrawer((e as CustomEvent).detail)
+    const termUpdated = (e: Event) => setActiveTerminal((e as CustomEvent).detail)
+    const termDeleted = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      if (activeTerminal()?.id === detail.terminalID) setActiveTerminal(null)
+    }
     window.addEventListener("openDiffDrawer", diffHandler)
     window.addEventListener("openFileDrawer", fileHandler)
     window.addEventListener("openContentDrawer", contentHandler)
+    window.addEventListener("interactiveTerminalUpdated", termUpdated)
+    window.addEventListener("interactiveTerminalDeleted", termDeleted)
     onCleanup(() => {
       window.removeEventListener("openDiffDrawer", diffHandler)
       window.removeEventListener("openFileDrawer", fileHandler)
       window.removeEventListener("openContentDrawer", contentHandler)
+      window.removeEventListener("interactiveTerminalUpdated", termUpdated)
+      window.removeEventListener("interactiveTerminalDeleted", termDeleted)
     })
   })
   const session = useSession()
@@ -499,6 +510,9 @@ const AppContent: Component = () => {
       </Show>
       <Show when={contentDrawer()}>
         {(data) => <ContentDrawer content={data().content} language={data().language} onClose={() => setContentDrawer(null)} />}
+      </Show>
+      <Show when={activeTerminal()}>
+        {(term) => <InteractiveTerminalDrawer terminal={term()} onClose={() => setActiveTerminal(null)} />}
       </Show>
     </div>
   )

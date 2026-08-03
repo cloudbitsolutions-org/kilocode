@@ -310,6 +310,20 @@ function mapSSEEvent(event: any): ExtensionMessage | null {
         permissionID: event.properties?.requestID,
       } as any
 
+    case "interactive_terminal.updated": {
+      const props = event.properties
+      if (!props?.info) return null
+      window.dispatchEvent(new CustomEvent("interactiveTerminalUpdated", { detail: props.info }))
+      return null
+    }
+
+    case "interactive_terminal.deleted": {
+      const props = event.properties
+      if (!props) return null
+      window.dispatchEvent(new CustomEvent("interactiveTerminalDeleted", { detail: { terminalID: props.terminalID } }))
+      return null
+    }
+
     case "todo.updated":
       return {
         type: "todoUpdated",
