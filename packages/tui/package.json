@@ -63,6 +63,7 @@
     "opentui-spinner": "catalog:",
     "remeda": "catalog:",
     "strip-ansi": "7.1.2",
+    "@solid-primitives/scheduled": "1.5.2",
     "solid-js": "catalog:"
   },
   "devDependencies": {
