@@ -22,6 +22,7 @@ import { useServer } from "../src/context/server"
 import { useSession } from "../src/context/session"
 import { useProvider } from "../src/context/provider"
 import { useConfig } from "../src/context/config"
+import { cycleVariant } from "../src/context/session-variant-store"
 import { ModelSelectorBase } from "../src/components/shared/ModelSelector"
 import { ModeSwitcherBase } from "../src/components/shared/ModeSwitcher"
 import { SpeechToTextButton } from "../src/components/speech-to-text/SpeechToTextButton"
@@ -43,6 +44,8 @@ import { insertSpacedText } from "../src/components/chat/prompt-input-utils"
 import { WandSparkles } from "@kilocode/kilo-ui/lucide"
 import { BranchSelect, BranchSelectPopover } from "../src/components/shared/BranchSelect"
 import { tracker } from "./telemetry"
+import { cycleAgent } from "../src/context/session-agent"
+import type { ModeRouter } from "./mode-router"
 
 type VersionCount = 1 | 2 | 3 | 4
 const VERSION_OPTIONS: VersionCount[] = [1, 2, 3, 4]
@@ -73,13 +76,18 @@ function sanitizeBranchName(name: string): string {
     .join("/")
 }
 
-export const NewWorktreeDialog: Component<{ onClose: () => void; defaultBaseBranch?: string }> = (props) => {
+export const NewWorktreeDialog: Component<{
+  onClose: () => void
+  defaultBaseBranch?: string
+  projectId?: string
+  mode: ModeRouter
+}> = (props) => {
   const { t } = useLanguage()
   const vscode = useVSCode()
   const server = useServer()
   const session = useSession()
   const provider = useProvider()
-  const { config, features } = useConfig()
+  const { config, features, settings } = useConfig()
   const metrics = tracker(vscode)
   const track = (button: string, properties?: Record<string, string | number | boolean | undefined>) =>
     metrics.track(button, "configure_worktree_dialog", properties)
@@ -98,10 +106,12 @@ export const NewWorktreeDialog: Component<{ onClose: () => void; defaultBaseBran
   const cached = vscode.getState<Record<string, unknown>>()
   const [prompt, setPrompt] = createSignal((cached?.advancedDialogPrompt as string) ?? "")
   const [versions, setVersions] = createSignal<VersionCount>(1)
-  const [model, setModel] = createSignal<{ providerID: string; modelID: string } | null>(session.configModel())
+  const initialAgent = session.selectedAgent()
+  const initialModel = session.modelForAgent(initialAgent)
+  const [model, setModel] = createSignal<{ providerID: string; modelID: string } | null>(initialModel)
   const [compareMode, setCompareMode] = createSignal(false)
   const [modelAllocations, setModelAllocations] = createSignal<ModelAllocations>(new Map())
-  const [agent, setAgent] = createSignal(session.selectedAgent())
+  const [agent, setAgent] = createSignal(initialAgent)
   const [starting, setStarting] = createSignal(false)
   const [enhancing, setEnhancing] = createSignal(false)
   const [showAdvanced, setShowAdvanced] = createSignal(false)
@@ -110,7 +120,7 @@ export const NewWorktreeDialog: Component<{ onClose: () => void; defaultBaseBran
   const [baseBranchOpen, setBaseBranchOpen] = createSignal(false)
   const [compareOpen, setCompareOpen] = createSignal(false)
   const [highlightedIndex, setHighlightedIndex] = createSignal(0)
-  const [variant, setVariant] = createSignal<string | undefined>(session.currentVariant())
+  const [variant, setVariant] = createSignal<string | undefined>(session.variantForAgent(initialAgent, initialModel))
   const [sandbox, setSandbox] = createSignal<boolean | undefined>()
   const [sandboxDefault, setSandboxDefault] = createSignal<boolean | undefined>()
   const [sandboxOverride, setSandboxOverride] = createSignal<boolean | undefined>()
@@ -129,6 +139,34 @@ export const NewWorktreeDialog: Component<{ onClose: () => void; defaultBaseBran
     request = undefined
     setEnhancing(false)
   }
+
+  const selectAgent = (name: string) => {
+    setAgent(name)
+    const sel = session.modelForAgent(name)
+    setModel(sel)
+    setVariant(session.variantForAgent(name, sel))
+  }
+
+  const resetModel = () => {
+    const sel = session.configModelForAgent(agent())
+    setModel(sel)
+    setVariant(session.variantForAgent(agent(), sel))
+  }
+
+  const cycle = (direction: 1 | -1) => {
+    cycleAgent({
+      agents: session.agents(),
+      direction,
+      selected: () => agent(),
+      select: selectAgent,
+    })
+  }
+
+  createEffect(() => {
+    if (tab() !== "new") return
+    const dispose = props.mode.register(cycle)
+    onCleanup(dispose)
+  })
 
   // Variant list for the currently selected model
   const variants = createMemo(() => {
@@ -150,7 +188,7 @@ export const NewWorktreeDialog: Component<{ onClose: () => void; defaultBaseBran
   // True when the user has changed the model from the session/config default
   const overridden = createMemo(() => {
     const sel = model()
-    const cfg = session.configModel()
+    const cfg = session.configModelForAgent(agent())
     if (!sel || !cfg) return false
     return sel.providerID !== cfg.providerID || sel.modelID !== cfg.modelID
   })
@@ -245,10 +283,11 @@ export const NewWorktreeDialog: Component<{ onClose: () => void; defaultBaseBran
   createEffect(() => persistImages(imageAttach.images()))
 
   let textareaRef: HTMLTextAreaElement | undefined
+  let containerRef: HTMLDivElement | undefined
 
   onMount(() => {
     setBranchesLoading(true)
-    vscode.postMessage({ type: "agentManager.requestBranches" })
+    vscode.postMessage({ type: "agentManager.requestBranches", projectId: props.projectId })
     // Resize textarea if restoring a cached prompt
     if (prompt()) adjustHeight()
     const focus = () => {
@@ -300,6 +339,7 @@ export const NewWorktreeDialog: Component<{ onClose: () => void; defaultBaseBran
 
     vscode.postMessage({
       type: "agentManager.createMultiVersion",
+      projectId: props.projectId,
       text,
       name: name().trim() || undefined,
       versions: count,
@@ -339,10 +379,33 @@ export const NewWorktreeDialog: Component<{ onClose: () => void; defaultBaseBran
     textareaRef.focus()
   }
 
+  const onKey = (e: KeyboardEvent) => {
+    // Shift+Tab cycles reasoning effort variants (setting: chat.shiftTabCyclesVariant).
+    // When disabled or no variants exist, fall through to default focus navigation.
+    if (e.key === "Tab" && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (settings()["chat.shiftTabCyclesVariant"] === false) return
+      const list = variants()
+      if (list.length === 0) return
+      const next = cycleVariant(effectiveVariant(), list)
+      if (!next) return
+      e.preventDefault()
+      setVariant(next)
+      return
+    }
+    undo(e)
+  }
+
   const adjustHeight = () => {
-    if (!textareaRef) return
-    textareaRef.style.height = "auto"
-    textareaRef.style.height = `${Math.min(textareaRef.scrollHeight, 200)}px`
+    const box = containerRef
+    const area = textareaRef
+    if (!box || !area) return
+    // Grow the container with the prompt (same 200px auto-grow cap as the
+    // sidebar prompt), never the textarea: it fills the container and is the
+    // only element that scrolls. A manual container resize persists until the
+    // next input re-fits the height.
+    box.style.height = "auto"
+    const chrome = box.offsetHeight - area.offsetHeight
+    box.style.height = `${Math.min(area.scrollHeight, 200) + chrome}px`
   }
 
   const insertSpeechText = (value: string) => {
@@ -445,7 +508,7 @@ export const NewWorktreeDialog: Component<{ onClose: () => void; defaultBaseBran
     const url = prUrl().trim()
     if (!url || isPending()) return
     setPrPending(true)
-    vscode.postMessage({ type: "agentManager.importFromPR", url })
+    vscode.postMessage({ type: "agentManager.importFromPR", projectId: props.projectId, url })
   }
 
   const handleBranchSelect = (name: string) => {
@@ -454,7 +517,7 @@ export const NewWorktreeDialog: Component<{ onClose: () => void; defaultBaseBran
     setImportPending(true)
     setBranchOpen(false)
     setBranchSearch("")
-    vscode.postMessage({ type: "agentManager.importFromBranch", branch: name })
+    vscode.postMessage({ type: "agentManager.importFromBranch", projectId: props.projectId, branch: name })
   }
 
   return (
@@ -491,6 +554,7 @@ export const NewWorktreeDialog: Component<{ onClose: () => void; defaultBaseBran
             />
             {/* Prompt input — reuses the sidebar chat-input base classes for consistent styling */}
             <div
+              ref={containerRef}
               class="prompt-input-container am-prompt-input-container"
               classList={{ "prompt-input-container--dragging": imageAttach.dragging() }}
               onDragOver={imageAttach.handleDragOver}
@@ -541,7 +605,7 @@ export const NewWorktreeDialog: Component<{ onClose: () => void; defaultBaseBran
                       persistPrompt(val)
                       adjustHeight()
                     }}
-                    onKeyDown={undo}
+                    onKeyDown={onKey}
                     onPaste={(e) => imageAttach.handlePaste(e)}
                     rows={3}
                     dir="auto"
@@ -554,7 +618,7 @@ export const NewWorktreeDialog: Component<{ onClose: () => void; defaultBaseBran
                     <ModeSwitcherBase
                       agents={session.agents()}
                       value={agent()}
-                      onSelect={setAgent}
+                      onSelect={selectAgent}
                       portal={false}
                       deferDismiss
                     />
@@ -575,13 +639,14 @@ export const NewWorktreeDialog: Component<{ onClose: () => void; defaultBaseBran
                       onSelect={setVariant}
                       portal={false}
                       deferDismiss
+                      cycleHint={settings()["chat.shiftTabCyclesVariant"] !== false}
                     />
                     <Show when={overridden()}>
                       <Tooltip value={t("prompt.action.resetModel")} placement="top">
                         <Button
                           variant="ghost"
                           size="small"
-                          onClick={() => setModel(session.configModel())}
+                          onClick={resetModel}
                           aria-label={t("prompt.action.resetModel")}
                         >
                           <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
@@ -841,7 +906,9 @@ export const NewWorktreeDialog: Component<{ onClose: () => void; defaultBaseBran
                           }
                         >
                           <span class="am-selector-value">
-                            {[...modelAllocations().values()].map((e) => e.name).join(", ")}
+                            {[...modelAllocations().values()]
+                              .map((e) => (e.variant ? `${e.name} (${e.variant})` : e.name))
+                              .join(", ")}
                           </span>
                         </Show>
                       </span>

@@ -740,6 +740,8 @@ export function Diff<T>(props: DiffProps<T>) {
         containerWrapper: container,
       })
     } else {
+      const oldFile = local.before!
+      const newFile = local.after!
       const beforeContents = before()
       const afterContents = after()
 
@@ -749,8 +751,8 @@ export function Diff<T>(props: DiffProps<T>) {
       }
 
       instance.render({
-        oldFile: { name: local.before?.name || "", ...local.before, contents: beforeContents, cacheKey: cacheKey(beforeContents) } as any,
-        newFile: { name: local.after?.name || "", ...local.after, contents: afterContents, cacheKey: cacheKey(afterContents) } as any,
+        oldFile: { name: oldFile?.name || "", ...oldFile, contents: beforeContents, cacheKey: cacheKey(beforeContents) } as any,
+        newFile: { name: newFile?.name || "", ...newFile, contents: afterContents, cacheKey: cacheKey(afterContents) } as any,
         lineAnnotations: annotations,
         containerWrapper: container,
       })
