@@ -1,7 +1,6 @@
 /** @jsxImportSource solid-js */
 
 import { Component, For, Show, createSignal, createMemo, onMount } from "solid-js"
-import { IconButton } from "@kilocode/kilo-ui/icon-button"
 import { useSession } from "../../context/session"
 import { useLanguage } from "../../context/language"
 import { formatRelativeDate } from "../../utils/date"
