@@ -86,7 +86,7 @@ export const DataBridge: Component<{ children: any }> = (props) => {
     for (const p of session.permissions()) {
       const sid = p.sessionID
       if (!sid) continue
-      ;(grouped[sid] ??= []).push(p)
+        ; (grouped[sid] ??= []).push(p)
     }
     return grouped
   })
@@ -162,11 +162,11 @@ export const DataBridge: Component<{ children: any }> = (props) => {
   // File existence validation for code span candidates
   const pending = new Map<string, (existing: string[]) => void>()
   const counter = { n: 0 }
-  const validateFiles = (paths: string[]): Promise<string[]> => {
+  const validateFiles = (sessionID: string, paths: string[]): Promise<string[]> => {
     const id = `vf-${++counter.n}`
     return new Promise((resolve) => {
       pending.set(id, resolve)
-      vscode.postMessage({ type: "validateFiles", id, paths })
+      vscode.postMessage({ type: "validateFiles", id, sessionID, paths })
       setTimeout(() => {
         if (pending.has(id)) {
           pending.delete(id)
@@ -425,6 +425,8 @@ const AppContent: Component = () => {
           onClose={() => setDrawerOpen(false)}
           onSelectSession={handleDrawerSelect}
           onNewSession={handleDrawerNew}
+          onHistory={() => setCurrentView("history")}
+          onSettings={() => setCurrentView("settings")}
           width={drawerWidth()}
         />
         <div
@@ -473,6 +475,7 @@ const AppContent: Component = () => {
                   <Settings
                     tab={settingsTab()}
                     onTabChange={setSettingsTab}
+                    onBack={() => setCurrentView("newTask")}
                     onMigrationClick={(source) => {
                       setMigrationSource(source)
                       setMigrationNeeded(true)

@@ -11,6 +11,8 @@ import { SidebarTopBar } from "./SidebarTopBar"
 export interface SessionDrawerProps {
   onSelectSession: (id: string) => void
   onNewSession: () => void
+  onSettings: () => void
+  onHistory: () => void
   open: boolean
   onClose: () => void
   width?: number
@@ -47,7 +49,14 @@ export const SessionDrawer: Component<SessionDrawerProps> = (props) => {
             props.onNewSession()
             props.onClose()
           }}
-          onHistory={() => {}}
+          onHistory={() => {
+            props.onHistory()
+            props.onClose()
+          }}
+          onSettings={() => {
+            props.onSettings()
+            props.onClose()
+          }}
         />
         <div class="session-drawer-search">
           <input

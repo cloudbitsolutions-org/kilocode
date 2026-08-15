@@ -527,10 +527,21 @@ async function handleRequestProviders() {
 async function handleRequestConfig() {
   try {
     const res = await client.config.overlay({ scope: "global" })
+    const globalConfig = res.data ? (res.data as any).global ?? {} : {}
+    const projRes = directory ? await client.config.overlay({ scope: "project", directory }) : null
+    const projectConfig = projRes && projRes.data ? (projRes.data as any).project ?? {} : {}
+
+    console.log("[Emulator] Loaded configs from:", {
+      global: (res.data as any)?.targets?.global?.file || "unknown",
+      project: (projRes?.data as any)?.targets?.project?.file || "none"
+    })
+
     if (res.data) {
       emitVsCodeMessage({
         type: "configLoaded",
-        config: (res.data as any).global ?? {},
+        config: globalConfig,
+        globalConfig: globalConfig,
+        projectConfig: projectConfig,
         features: {
           indexing: true,
           sandboxControls: true,
@@ -542,6 +553,8 @@ async function handleRequestConfig() {
     emitVsCodeMessage({
       type: "configLoaded",
       config: {} as any,
+      globalConfig: {} as any,
+      projectConfig: {} as any,
       features: { indexing: false, sandboxControls: false },
     } as any)
   }
@@ -1153,10 +1166,32 @@ export function setupEmulator() {
               })
               break
 
+            case "requestNotificationSettings":
+              emitVsCodeMessage({
+                type: "notificationSettingsLoaded",
+                settings: {
+                  attentionEnabled: true,
+                  attentionSound: "default",
+                },
+              } as any)
+              break
+
+            case "testNotification":
+              console.log("[Emulator] testNotification received. Sound:", msg.sound)
+              try {
+                if (msg.sound === "default") {
+                  msg.sound = "alert-06" // Or whatever default is
+                }
+                const url = new URL(`../../ui/src/assets/audio/${msg.sound}.mp3`, import.meta.url).href
+                const audio = new Audio(url)
+                audio.play().catch(e => console.error("[Emulator] Failed to play audio:", e))
+              } catch (e) {}
+              break
+
             case "requestKiloEmbeddingModels":
               emitVsCodeMessage({
                 type: "kiloEmbeddingModelsLoaded",
-                catalog: {} as any,
+                catalog: { defaultModel: "", models: [], aliases: {} } as any,
               })
               break
 
@@ -1330,13 +1365,39 @@ export function setupEmulator() {
 
             case "updateConfig":
               try {
-                await client.config.update({
-                  directory,
-                  ...msg.config,
+                // Global config (no directory)
+                if (msg.config && Object.keys(msg.config).length > 0) {
+                  await client.config.update({ config: msg.config })
+                }
+                // Project config
+                if (directory && msg.projectConfig && Object.keys(msg.projectConfig).length > 0) {
+                  await client.config.update({ directory, config: msg.projectConfig })
+                }
+
+                // Fetch the updated config to return it to the UI
+                const res = await client.config.overlay({ scope: "global" })
+                const globalConfig = res.data ? (res.data as any).global ?? {} : {}
+                const projRes = directory ? await client.config.overlay({ scope: "project", directory }) : null
+                const projectConfig = projRes && projRes.data ? (projRes.data as any).project ?? {} : {}
+
+                console.log("[Emulator] Saved configs to:", {
+                  global: (res.data as any)?.targets?.global?.file || "unknown",
+                  project: (projRes?.data as any)?.targets?.project?.file || "none"
                 })
-                await handleRequestConfig()
+
+                emitVsCodeMessage({
+                  type: "configUpdated",
+                  config: globalConfig,
+                  globalConfig: globalConfig,
+                  projectConfig: projectConfig,
+                  features: { indexing: true, sandboxControls: true }
+                } as any)
               } catch (e) {
                 console.error("[Emulator] Failed to update config:", e)
+                emitVsCodeMessage({
+                  type: "configUpdateFailed",
+                  message: "Failed to update config in emulator."
+                } as any)
               }
               break
 
@@ -1594,7 +1655,25 @@ export function setupEmulator() {
                break
 
              case "telemetry":
-               // No-op telemetry in emulator
+             case "settingsTabChanged":
+             case "login":
+             case "refreshProfile":
+               // No-op in emulator context
+               break
+
+             case "requestBrowserSettings":
+               window.postMessage({
+                 type: "browserSettingsLoaded",
+                 settings: {
+                   enabled: false,
+                   useSystemChrome: true,
+                   headless: false,
+                 }
+               }, "*")
+               break
+
+             case "openConfigFile":
+               window.parent.postMessage({ type: 'navigateZaraCli', path: '/console/settings/sources' }, "*")
                break
 
             default:

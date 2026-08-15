@@ -39,16 +39,14 @@
 
 /* ===== Interactive cursors ===== */
 
-:where(
-  button:not(:disabled),
+:where(button:not(:disabled),
   a[href],
   summary,
   [role="button"]:not([aria-disabled="true"]),
   [role="link"]:not([aria-disabled="true"]),
   [role="menuitem"]:not([aria-disabled="true"]),
   [role="option"]:not([aria-disabled="true"]),
-  [role="tab"]:not([aria-disabled="true"])
-) {
+  [role="tab"]:not([aria-disabled="true"])) {
   cursor: pointer;
 }
 

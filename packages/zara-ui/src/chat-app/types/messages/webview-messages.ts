@@ -153,6 +153,7 @@ export interface OpenContentRequest {
 export interface ValidateFilesRequest {
   type: "validateFiles"
   id: string
+  sessionID: string
   paths: string[]
 }
 

@@ -1,8 +1,6 @@
 input,
 select,
 textarea,
-[data-component="input"],
-[data-component="textarea"],
 [data-slot="native-select"] {
   min-width: 0;
   border: 1px solid var(--input);
@@ -20,14 +18,12 @@ textarea,
 
 input,
 select,
-[data-component="input"],
 [data-slot="native-select"] {
   height: 1.75rem;
   padding: 0.125rem 0.5rem;
 }
 
-textarea,
-[data-component="textarea"] {
+textarea {
   min-height: 4rem;
   padding: 0.5rem;
   resize: vertical;
@@ -41,8 +37,6 @@ textarea::placeholder {
 input:focus,
 select:focus,
 textarea:focus,
-[data-component="input"]:focus,
-[data-component="textarea"]:focus,
 [data-slot="native-select"]:focus {
   outline: 0;
   border-color: var(--ring);

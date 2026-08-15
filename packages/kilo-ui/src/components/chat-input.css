@@ -17,6 +17,10 @@
     padding: 9px;
     font-size: var(--kilo-font-size-13);
     line-height: normal;
+    background: transparent;
+    border: none;
+    outline: none;
+    box-shadow: none;
   }
 
   [data-slot="input-helper-text"] {

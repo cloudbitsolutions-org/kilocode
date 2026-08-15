@@ -17,7 +17,7 @@ export const PLATFORM = "agent-manager" as const
 export const SNAPSHOT_INITIALIZATION = "wait" as const
 
 /** Kilo config directory name (project-level and inside worktrees). */
-export const KILO_DIR = ".kilo"
+export const KILO_DIR = ".codezara"
 
 /** Legacy config directory name for backward compatibility reads. */
 export const LEGACY_DIR = ".kilocode"

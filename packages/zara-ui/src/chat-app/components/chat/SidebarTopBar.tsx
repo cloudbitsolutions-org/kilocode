@@ -17,12 +17,13 @@ import "@vscode/codicons/dist/codicon.css"
 export interface SidebarTopBarProps {
   onNewTask: () => void
   onHistory: () => void
+  onSettings: () => void
   /** Telemetry surface — distinguishes the sidebar from the "Open in Tab" panel, which shares this component. */
   surface: string
 }
 
 /** Codicon names used below. */
-type Codicon = "add" | "history" | "organization" | "comment-discussion" | "extensions" | "account" | "settings-gear"
+type Codicon = "add" | "history" | "comment-discussion" | "extensions" | "account" | "settings-gear"
 
 interface Action {
   key: string
@@ -43,15 +44,10 @@ export const SidebarTopBar: Component<SidebarTopBarProps> = (props) => {
       properties: { button, surface: props.surface },
     })
 
-  const open = (
-    type: "openAgentManager" | "openSettingsPanel",
-  ) => vscode.postMessage({ type })
-
   const actions: Action[] = [
     { key: "newTask", codicon: "add", button: "new_task", run: () => props.onNewTask() },
     { key: "history", codicon: "history", button: "history", run: () => props.onHistory() },
-    { key: "agentManager", codicon: "organization", button: "agent_manager", run: () => open("openAgentManager") },
-    { key: "settings", codicon: "settings-gear", button: "settings", run: () => open("openSettingsPanel") },
+    { key: "settings", codicon: "settings-gear", button: "settings", run: () => props.onSettings() },
   ]
 
   return (

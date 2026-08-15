@@ -41,7 +41,7 @@ export namespace KilocodeConfig {
   export const ALL_CONFIG_FILES = ["kilo.jsonc", "kilo.json", "opencode.jsonc", "opencode.json"] as const
 
   /** Config directory suffixes in update-target preference order. */
-  export const KILO_DIR_SUFFIXES = [".kilo", ".kilocode"] as const
+  export const KILO_DIR_SUFFIXES = [".codezara", ".kilo", ".kilocode"] as const
 
   /**
    * List every project config file the read chain can merge: config files in

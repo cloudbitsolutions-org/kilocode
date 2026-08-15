@@ -33,6 +33,7 @@ export interface SettingsProps {
   tab?: string
   onTabChange?: (tab: string) => void
   onMigrationClick?: (source: MigrationSource) => void // legacy-migration
+  onBack?: () => void
 }
 
 const Settings: Component<SettingsProps> = (props) => {
@@ -135,9 +136,14 @@ const Settings: Component<SettingsProps> = (props) => {
           gap: "8px",
         }}
       >
-        <h2 style={{ "font-size": "var(--kilo-font-size-16)", "font-weight": "600", margin: 0, flex: 1 }}>
-          {language.t("sidebar.settings")}
-        </h2>
+        <div style={{ display: "flex", "align-items": "center", gap: "8px", flex: 1 }}>
+          <Show when={props.onBack}>
+            <Button variant="ghost" size="small" icon="chevron-left" onClick={props.onBack} />
+          </Show>
+          <h2 style={{ "font-size": "var(--kilo-font-size-16)", "font-weight": "600", margin: 0 }}>
+            {language.t("sidebar.settings")}
+          </h2>
+        </div>
         <Button variant="secondary" size="small" icon="edit" onClick={() => open("local")}>
           {language.t("settings.openLocalConfig")}
         </Button>
