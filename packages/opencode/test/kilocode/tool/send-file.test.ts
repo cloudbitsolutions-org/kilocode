@@ -453,13 +453,13 @@ describe("send_file tool", () => {
     const tool = { id: "send_file" } as Tool.Def
     const extra = KiloToolRegistry.extra(
       {
-        codebase: tool,
         recall: tool,
         managerModels: tool,
         memory: tool,
         save: tool,
         manager: tool,
         process: tool,
+        chart: tool,
         image: tool,
         notify: { id: "notify_user" } as Tool.Def,
         send: tool,
