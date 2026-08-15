@@ -238,9 +238,9 @@ export const ModelSelectorBase: Component<ModelSelectorBaseProps> = (props) => {
       return visibleModels()
     }
     return rankModelSearch(visibleModels(), q, {
-      usage: session?.modelUsageHistory(),
+      usage: (session as any)?.modelUsageHistory?.() || {},
       favorites: new Set(session?.favoriteModels().map((item) => modelKey(item.providerID, item.modelID))),
-      recent: session?.recentModels(),
+      recent: (session as any)?.recentModels?.() || [],
     })
   })
 
@@ -279,7 +279,7 @@ export const ModelSelectorBase: Component<ModelSelectorBaseProps> = (props) => {
       mostUsed.push(
         ...mostUsedModels(
           visibleModels().filter((model) => !isAuto(model) && model.recommendedIndex === undefined),
-          session.modelUsageHistory(),
+          (session as any).modelUsageHistory?.() || {},
           favoriteKeys(),
         ),
       )

@@ -26,6 +26,8 @@ import { TurnOutcome } from "../shared/TurnOutcome"
 import { QuestionDock } from "./QuestionDock"
 import { Virtualizer, type VirtualizerHandle } from "virtua/solid"
 import { SuggestBar } from "./SuggestBar"
+import { PromptRail } from "./PromptRail"
+import { capacity, promptItems, railEntries, type PromptRailItem } from "./prompt-rail"
 import {
   getMeasurement,
   getScroll,
@@ -158,6 +160,55 @@ export const MessageList: Component<MessageListProps> = (props) => {
   const keys = createMemo(() => partition().virtual.map((row) => row.key))
   const fingerprint = createMemo(() => rowFingerprint(keys()))
 
+  const jump = (key: string) => {
+    autoScroll.pause()
+    const index = keys().indexOf(key)
+    if (index >= 0) {
+      virtualizer()?.scrollToIndex(index, { align: "start" })
+      return
+    }
+    const el = scrollEl()
+    const target = el?.querySelector<HTMLElement>(`[data-row-key="${CSS.escape(key)}"]`)
+    if (target) {
+      target.scrollIntoView({ block: "start" })
+    }
+  }
+
+  const [height, setHeight] = createSignal(0)
+  const [seek, setSeek] = createSignal<{ sid: string; count: number }>()
+
+  const items = createMemo(() => promptItems(rows()))
+  const entries = createMemo(() => railEntries(items(), capacity(height()), session.hasOlderMessages()))
+  const railActiveKey = createMemo(() => {
+    const active = activeUserID()
+    if (!active) return undefined
+    return items().find((item) => item.key === active)?.key
+  })
+
+  const first = () => {
+    const item = items()[0]
+    if (!session.hasOlderMessages()) {
+      if (item) jump(item.key)
+      return
+    }
+    setSeek({ sid: session.currentSessionID(), count: session.messages().length })
+    session.loadOlderMessages()
+  }
+
+  createEffect(() => {
+    const request = seek()
+    if (!request || session.loadingOlderMessages() || request.sid !== session.currentSessionID()) return
+    const count = session.messages().length
+    if (count > request.count) {
+      setSeek({ sid: request.sid, count })
+      session.loadOlderMessages()
+    } else {
+      setSeek(undefined)
+      const item = items()[0]
+      if (item) jump(item.key)
+    }
+  })
+
   // Clicking a bar in the task timeline scrolls the transcript to that message.
   // Jumps land instantly (no smooth animation): while pinned at the bottom, a
   // smooth scroll's initial frames sit within createAutoScroll's near-bottom
@@ -238,6 +289,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
     const el = scrollEl()
     if (!el) return
     const style = getComputedStyle(el)
+    setHeight(el.clientHeight)
     setLayout(
       layoutFingerprint({
         width: Math.round(el.clientWidth),
@@ -394,6 +446,28 @@ export const MessageList: Component<MessageListProps> = (props) => {
           </Show>
         </div>
       </div>
+
+      <PromptRail
+        entries={entries}
+        items={items}
+        active={() => railActiveKey()}
+        onSelect={(item: PromptRailItem) => jump(item.key)}
+        onFirst={first}
+        onLatest={() => {
+          const item = items().at(-1)
+          if (item) jump(item.key)
+        }}
+        onLoadOlder={() => session.loadOlderMessages()}
+        onWheel={(deltaY: number) => {
+          const el = scrollEl()
+          if (el) el.scrollTop += deltaY
+        }}
+        height={height}
+        hasOlder={session.hasOlderMessages}
+        loadingOlder={session.loadingOlderMessages}
+        prepending={() => session.messageMutation() === "prepend"}
+        seeking={() => Boolean(seek())}
+      />
 
       <Show when={autoScroll.userScrolled()}>
         <button

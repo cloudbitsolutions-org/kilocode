@@ -674,6 +674,13 @@ export const dict = {
   "session.messages.loading": "Loading messages...",
   "session.messages.jumpToLatest": "Jump to latest",
 
+  "session.prompts.navLabel": "Prompt Navigator",
+  "session.prompts.tick": "Prompt {{index}} of {{total}}: {{prompt}}",
+  "session.prompts.first": "First prompt",
+  "session.prompts.latest": "Latest prompt",
+  "session.prompts.overflow": "+{{count}} more",
+  "session.prompts.queued": "Queued",
+  "session.prompts.noAnswer": "No answer yet",
   "session.context.addToContext": "Add {{selection}} to context",
 
   "session.new.worktree.main": "Main branch",
@@ -739,6 +746,11 @@ export const dict = {
   "common.loadMore": "Load more",
   "common.key.esc": "ESC",
 
+  "sidebar.topBar.label": "Sidebar actions",
+  "sidebar.topBar.newTask": "New Task",
+  "sidebar.topBar.history": "History",
+  "sidebar.topBar.agentManager": "Agent Manager",
+  "sidebar.topBar.settings": "Settings",
   "sidebar.menu.toggle": "Toggle menu",
   "sidebar.nav.projectsAndSessions": "Projects and sessions",
   "sidebar.settings": "Settings",

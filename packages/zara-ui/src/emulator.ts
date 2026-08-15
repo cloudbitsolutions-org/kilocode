@@ -1589,6 +1589,14 @@ export function setupEmulator() {
                await handleSuggestionDismiss(msg)
                break
 
+             case "openAgentManager":
+               window.parent.postMessage({ type: 'navigateZaraCli', path: '/console/settings/agents' }, "*")
+               break
+
+             case "telemetry":
+               // No-op telemetry in emulator
+               break
+
             default:
               console.log(
                 "[Emulator] Unhandled message type:",

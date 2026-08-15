@@ -15,7 +15,6 @@ import { showToast } from "@kilocode/kilo-ui/toast"
 import { DropdownMenu } from "@kilocode/kilo-ui/dropdown-menu"
 import { TaskHeader } from "./TaskHeader"
 import { MessageList } from "./MessageList"
-import { ChatMessageNav } from "./ChatMessageNav"
 import type { UserMessage } from "@kilocode/sdk/v2"
 import { AgentRequirements } from "./AgentRequirements"
 import { PromptInput } from "./PromptInput"
@@ -347,14 +346,6 @@ export const ChatView: Component<ChatViewProps> = (props) => {
       </Show>
       <SessionTabStrip />
       <TaskHeader readonly={props.readonly} onBack={props.onBack} onToggleDrawer={props.onShowHistory} />
-      <Show when={hasUserMessages()}>
-        <div class="chat-message-nav-rail">
-          <ChatMessageNav
-            messages={userMessages()}
-            onMessageSelect={(m) => window.dispatchEvent(new CustomEvent("scrollToMessage", { detail: { id: m.id } }))}
-          />
-        </div>
-      </Show>
       <div class="chat-messages-wrapper">
         <div class="chat-messages">
           <Show
