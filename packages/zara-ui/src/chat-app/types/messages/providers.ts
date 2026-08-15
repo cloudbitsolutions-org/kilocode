@@ -64,3 +64,10 @@ export interface ProviderConfig {
   env?: string[]
   options?: Record<string, unknown>
 }
+
+export interface ModelUsage {
+  count: number
+  lastUsed: number
+}
+
+export type ModelUsageMap = Record<string, ModelUsage>

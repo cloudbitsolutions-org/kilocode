@@ -7,7 +7,9 @@ import { useLanguage } from "../../context/language"
 import { formatRelativeDate } from "../../utils/date"
 import type { SessionInfo } from "../../types/messages"
 
-interface SessionDrawerProps {
+import { SidebarTopBar } from "./SidebarTopBar"
+
+export interface SessionDrawerProps {
   onSelectSession: (id: string) => void
   onNewSession: () => void
   open: boolean
@@ -40,19 +42,14 @@ export const SessionDrawer: Component<SessionDrawerProps> = (props) => {
         classList={{ "session-drawer--open": props.open }}
         style={props.width ? { width: `${props.width}px` } : undefined}
       >
-        <div class="session-drawer-header">
-          <span class="session-drawer-title">{language.t("session.tab.local")}</span>
-          <IconButton
-            icon="plus"
-            size="small"
-            variant="ghost"
-            aria-label={language.t("command.session.new")}
-            onClick={() => {
-              props.onNewSession()
-              props.onClose()
-            }}
-          />
-        </div>
+        <SidebarTopBar
+          surface="sidebar"
+          onNewTask={() => {
+            props.onNewSession()
+            props.onClose()
+          }}
+          onHistory={() => {}}
+        />
         <div class="session-drawer-search">
           <input
             type="text"

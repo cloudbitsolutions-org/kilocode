@@ -1,6 +1,6 @@
 {
   "name": "@kilocode/zara-ui",
-  "version": "7.4.18",
+  "version": "7.4.22",
   "private": false,
   "type": "module",
   "files": [
@@ -14,20 +14,21 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@kobalte/core": "0.13.11",
-    "@thisbeyond/solid-dnd": "0.7.5",
     "@kilocode/kilo-i18n": "workspace:*",
     "@kilocode/kilo-indexing": "workspace:*",
     "@kilocode/kilo-memory": "workspace:*",
     "@kilocode/kilo-ui": "workspace:*",
     "@kilocode/kilo-web-ui": "workspace:*",
     "@kilocode/sdk": "workspace:*",
+    "@kobalte/core": "0.13.11",
+    "@lottiefiles/dotlottie-web": "0.74.0",
     "@opencode-ai/ui": "workspace:*",
     "@pierre/diffs": "catalog:",
     "@solidjs/router": "catalog:",
-    "@lottiefiles/dotlottie-web": "0.74.0",
-    "ghostty-web": "0.4.0",
+    "@thisbeyond/solid-dnd": "0.7.5",
     "@types/qrcode": "1.5.6",
+    "@vscode/codicons": "0.0.46-24",
+    "ghostty-web": "0.4.0",
     "qrcode": "1.5.4",
     "solid-js": "catalog:",
     "virtua": "catalog:",

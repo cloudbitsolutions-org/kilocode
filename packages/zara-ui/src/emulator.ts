@@ -902,6 +902,18 @@ async function handleQuestionReject(msg: any) {
   }
 }
 
+async function handleRenameSession(msg: any) {
+  try {
+    await (client.session as any).update({
+      sessionID: msg.sessionID,
+      directory,
+      title: msg.title,
+    })
+  } catch (e) {
+    console.error("[Emulator] Failed to rename session:", e)
+  }
+}
+
 async function handleRevertSession(msg: any) {
   const sessionID = msg.sessionID
   if (!sessionID) return
@@ -1269,6 +1281,14 @@ export function setupEmulator() {
 
             case "revertSession":
               await handleRevertSession(msg)
+              break
+
+            case "renameSession":
+              await handleRenameSession(msg)
+              break
+
+            case "sidebar.openSessions":
+              // Handled entirely by the web UI, nothing to do here
               break
 
             case "unrevertSession":

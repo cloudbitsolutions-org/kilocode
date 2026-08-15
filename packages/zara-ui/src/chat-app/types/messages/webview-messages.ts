@@ -227,6 +227,10 @@ export interface OpenMarketplacePanelRequest {
   directory?: string
 }
 
+export interface OpenProfilePanelRequest {
+  type: "openProfilePanel"
+}
+
 export interface OpenAgentManagerRequest {
   type: "openAgentManager"
 }
@@ -1211,6 +1215,7 @@ export type WebviewMessage =
   | OpenVSCodeSettingsRequest
   | OpenConfigFileRequest
   | OpenMarketplacePanelRequest
+  | OpenProfilePanelRequest
   | OpenAgentManagerRequest
   | OpenAdvancedWorktreeRequest
   | OpenKiloClawRequest
