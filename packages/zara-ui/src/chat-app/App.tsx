@@ -16,6 +16,7 @@ import { ContentDrawer } from "./components/chat/ContentDrawer"
 import { InteractiveTerminalDrawer, type InteractiveTerminalInfo } from "./components/chat/InteractiveTerminalDrawer"
 import Settings from "./components/settings/Settings"
 import ProfileView from "./components/profile/ProfileView"
+import { MarketplaceView } from "./components/marketplace/MarketplaceView"
 import { VSCodeProvider, useVSCode } from "./context/vscode"
 import { ServerProvider, useServer } from "./context/server"
 import { ProviderProvider, useProvider } from "./context/provider"
@@ -26,6 +27,7 @@ import { IndexingProvider } from "./context/indexing"
 import { AgentRequirementsProvider } from "./context/agent-requirements"
 import { MemoryProvider } from "./context/memory"
 import { SessionProvider, useSession } from "./context/session"
+import { MarketplaceSessionProvider } from "./context/marketplace-session"
 import { LocalTabsProvider, useLocalTabs } from "./context/local-tabs"
 import { LanguageBridge } from "./context/language-bridge"
 import { ChatView } from "./components/chat"
@@ -49,8 +51,8 @@ import { ImageModelsProvider } from "./context/image-models"
 import type { Message as SDKMessage, Part as SDKPart } from "@kilocode/sdk/v2"
 import "./styles/chat.css"
 
-type ViewType = "newTask" | "history" | "profile" | "settings" | "subAgentViewer"
-const VALID_VIEWS = new Set<string>(["newTask", "history", "profile", "settings", "subAgentViewer"])
+type ViewType = "newTask" | "history" | "profile" | "settings" | "subAgentViewer" | "marketplace"
+const VALID_VIEWS = new Set<string>(["newTask", "history", "profile", "settings", "subAgentViewer", "marketplace"])
 
 /**
  * Bridge our session store to the DataProvider's expected Data shape.
@@ -244,7 +246,7 @@ const AppContent: Component = () => {
   const [migrationNeeded, setMigrationNeeded] = createSignal(false)
   const [migrationSource, setMigrationSource] = createSignal<"legacy" | "roo">("legacy")
   const [drawerOpen, setDrawerOpen] = createSignal(false)
-  const [drawerWidth, setDrawerWidth] = createSignal(240)
+  const [drawerWidth, setDrawerWidth] = createSignal(360)
   const [diffDrawer, setDiffDrawer] = createSignal<DiffDrawerData | null>(null)
   const [fileDrawer, setFileDrawer] = createSignal<FileDrawerData | null>(null)
   const [contentDrawer, setContentDrawer] = createSignal<{ content: string; language?: string } | null>(null)
@@ -470,6 +472,11 @@ const AppContent: Component = () => {
                     deviceAuth={server.deviceAuth()}
                     onLogin={server.startLogin}
                   />
+                </Match>
+                <Match when={currentView() === "marketplace"}>
+                  <MarketplaceSessionProvider>
+                    <MarketplaceView onBack={() => setCurrentView("newTask")} />
+                  </MarketplaceSessionProvider>
                 </Match>
                 <Match when={currentView() === "settings"}>
                   <Settings

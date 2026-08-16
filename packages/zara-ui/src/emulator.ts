@@ -1,4 +1,5 @@
 import { createKiloClient } from "@kilocode/sdk/v2/client"
+import { parse as parseYaml } from "yaml"
 import type { ExtensionMessage } from "./chat-app/types/messages"
 
 // ─── SDK Client ─────────────────────────────────────────────────────────────
@@ -421,7 +422,7 @@ function setupEventStream() {
           emitVsCodeMessage(msg)
         }
       }
-      
+
       // Stream ended normally, we must reconnect
       if (!ctl.signal.aborted) {
         setTimeout(() => setupEventStream(), 1000)
@@ -1097,603 +1098,671 @@ function injectVscodeThemeVars() {
 
 export function setupEmulator() {
   injectVscodeThemeVars()
+  const mockMarketplaceInstalled = new Set<string>()
 
-  ;(window as any).acquireVsCodeApi = () => {
-    return {
-      postMessage: async (msg: any) => {
-        try {
-          switch (msg.type) {
-            case "webviewReady":
-              await handleWebviewReady()
-              break
+    ; (window as any).acquireVsCodeApi = () => {
+      return {
+        postMessage: async (msg: any) => {
+          try {
+            switch (msg.type) {
+              case "webviewReady":
+                await handleWebviewReady()
+                break
 
-            case "requestWorkStyle":
-              emitVsCodeMessage({
-                type: "workStyleLoaded",
-                style: "skipped",
-              })
-              break
-
-            case "requestAgents":
-              await handleRequestAgents()
-              break
-
-            case "requestProviders":
-              await handleRequestProviders()
-              break
-
-            case "requestConfig":
-              await handleRequestConfig()
-              break
-
-            case "requestSessions":
-            case "loadSessions":
-              await handleRequestSessions()
-              break
-
-            case "requestNotifications":
-              emitVsCodeMessage({
-                type: "notificationsLoaded",
-                notifications: [],
-                dismissedIds: [],
-              })
-              break
-
-            case "requestModelSelectorExpanded":
-              emitVsCodeMessage({
-                type: "modelSelectorExpandedLoaded",
-                value: true,
-              })
-              break
-
-            case "requestTimelineSetting":
-              emitVsCodeMessage({
-                type: "timelineSettingLoaded",
-                visible: settings.showTaskTimeline !== false,
-              })
-              break
-
-            case "requestAutocompleteSettings":
-              emitVsCodeMessage({
-                type: "autocompleteSettingsLoaded",
-                settings: {
-                  enableAutoTrigger: false,
-                  enableSmartInlineTaskKeybinding: false,
-                  enableChatAutocomplete: false,
-                  provider: null,
-                  model: null,
-                },
-              })
-              break
-
-            case "requestNotificationSettings":
-              emitVsCodeMessage({
-                type: "notificationSettingsLoaded",
-                settings: {
-                  attentionEnabled: true,
-                  attentionSound: "default",
-                },
-              } as any)
-              break
-
-            case "testNotification":
-              console.log("[Emulator] testNotification received. Sound:", msg.sound)
-              try {
-                if (msg.sound === "default") {
-                  msg.sound = "alert-06" // Or whatever default is
-                }
-                const url = new URL(`../../ui/src/assets/audio/${msg.sound}.mp3`, import.meta.url).href
-                const audio = new Audio(url)
-                audio.play().catch(e => console.error("[Emulator] Failed to play audio:", e))
-              } catch (e) {}
-              break
-
-            case "requestKiloEmbeddingModels":
-              emitVsCodeMessage({
-                type: "kiloEmbeddingModelsLoaded",
-                catalog: { defaultModel: "", models: [], aliases: {} } as any,
-              })
-              break
-
-            case "requestSkills":
-              emitVsCodeMessage({
-                type: "skillsLoaded",
-                skills: [] as any,
-              })
-              break
-
-            case "requestVariants":
-              emitVsCodeMessage({
-                type: "variantsLoaded",
-                variants: (settings.variants as any) || {},
-              })
-              break
-
-            case "requestModelSelections":
-              emitVsCodeMessage({
-                type: "modelSelectionsLoaded",
-                selections: (settings.modelSelections as any) || {},
-              })
-              break
-
-            case "requestRecents":
-              emitVsCodeMessage({
-                type: "recentsLoaded",
-                recents: (settings.recents as any) || [],
-              })
-              break
-
-            case "requestFavorites":
-              emitVsCodeMessage({
-                type: "favoritesLoaded",
-                favorites: [],
-              })
-              break
-
-            // ── Core chat operations ──
-
-            case "sendMessage":
-              await handleSendMessage(msg)
-              break
-
-            case "sendCommand":
-              await handleSendCommand(msg)
-              break
-
-            case "abort":
-              await handleAbort(msg)
-              break
-
-            case "reload":
-              window.location.reload()
-              break
-
-            case "loadMessages":
-              await handleLoadMessages(msg)
-              break
-
-            case "createSession":
-              await handleCreateSession()
-              break
-
-            case "clearSession":
-              currentSessionID = null
-              break
-
-            case "deleteSession":
-              await handleDeleteSession(msg)
-              break
-
-            // ── Session management ──
-
-            case "syncSession":
-              // Track the child session for events - messages will come via SSE
-              if (msg.sessionID) {
-                await handleLoadMessages({
-                  sessionID: msg.sessionID,
-                  mode: "replace",
+              case "requestWorkStyle":
+                emitVsCodeMessage({
+                  type: "workStyleLoaded",
+                  style: "skipped",
                 })
-              }
-              break
+                break
 
-            case "selectSession":
-              if (msg.sessionID) {
-                currentSessionID = msg.sessionID
-              }
-              break
+              case "requestAgents":
+                await handleRequestAgents()
+                break
 
-            // ── Agent / model selection ──
+              case "requestProviders":
+                await handleRequestProviders()
+                break
 
-            case "selectAgent":
-              selectedAgent = msg.agent
-              settings.selectedAgent = msg.agent
-              saveSettings(settings)
-              break
+              case "requestConfig":
+                await handleRequestConfig()
+                break
 
-            case "selectModel":
-              // Model selection is sent per-message, just acknowledge
-              break
+              case "requestSessions":
+              case "loadSessions":
+                await handleRequestSessions()
+                break
 
-            case "persistModelSelectorExpanded":
-              // No-op in web context
-              break
-
-            // ── Permissions / questions ──
-
-            case "permissionResponse":
-              await handlePermissionResponse(msg)
-              break
-
-            case "questionReply":
-              await handleQuestionReply(msg)
-              break
-
-            case "questionReject":
-              await handleQuestionReject(msg)
-              break
-
-            // ── Session operations ──
-
-            case "revertSession":
-              await handleRevertSession(msg)
-              break
-
-            case "renameSession":
-              await handleRenameSession(msg)
-              break
-
-            case "sidebar.openSessions":
-              // Handled entirely by the web UI, nothing to do here
-              break
-
-            case "unrevertSession":
-              try {
-                await (client.session as any).unrevert({
-                  sessionID: msg.sessionID,
-                  directory,
+              case "requestNotifications":
+                emitVsCodeMessage({
+                  type: "notificationsLoaded",
+                  notifications: [],
+                  dismissedIds: [],
                 })
-              } catch (e) {
-                console.error("[Emulator] Failed to unrevert:", e)
-              }
-              break
+                break
 
-            // ── File operations (no-ops in web context) ──
-
-            case "openFile":
-            case "openDiffVirtual":
-            case "openExternal":
-            case "openContent":
-            case "saveImage":
-            case "validateFiles":
-              if (msg.type === "openFile" && msg.filePath) {
-                window.dispatchEvent(new CustomEvent("openFileDrawer", { detail: { filePath: msg.filePath, line: msg.line, column: msg.column } }))
-              }
-              if (msg.type === "openExternal" && msg.url) {
-                window.open(msg.url, "_blank")
-              }
-              if (msg.type === "validateFiles" && msg.id) {
-                // Can't validate files in web context, return empty
+              case "requestModelSelectorExpanded":
                 emitVsCodeMessage({
-                  type: "validateFilesResult",
-                  id: msg.id,
-                  existing: [],
-                } as any)
-              }
-              break
-
-            // ── Config updates ──
-
-            case "updateConfig":
-              try {
-                // Global config (no directory)
-                if (msg.config && Object.keys(msg.config).length > 0) {
-                  await client.config.update({ config: msg.config })
-                }
-                // Project config
-                if (directory && msg.projectConfig && Object.keys(msg.projectConfig).length > 0) {
-                  await client.config.update({ directory, config: msg.projectConfig })
-                }
-
-                // Fetch the updated config to return it to the UI
-                const res = await client.config.overlay({ scope: "global" })
-                const globalConfig = res.data ? (res.data as any).global ?? {} : {}
-                const projRes = directory ? await client.config.overlay({ scope: "project", directory }) : null
-                const projectConfig = projRes && projRes.data ? (projRes.data as any).project ?? {} : {}
-
-                console.log("[Emulator] Saved configs to:", {
-                  global: (res.data as any)?.targets?.global?.file || "unknown",
-                  project: (projRes?.data as any)?.targets?.project?.file || "none"
+                  type: "modelSelectorExpandedLoaded",
+                  value: true,
                 })
+                break
 
+              case "requestTimelineSetting":
                 emitVsCodeMessage({
-                  type: "configUpdated",
-                  config: globalConfig,
-                  globalConfig: globalConfig,
-                  projectConfig: projectConfig,
-                  features: { indexing: true, sandboxControls: true }
-                } as any)
-              } catch (e) {
-                console.error("[Emulator] Failed to update config:", e)
+                  type: "timelineSettingLoaded",
+                  visible: settings.showTaskTimeline !== false,
+                })
+                break
+
+              case "requestAutocompleteSettings":
                 emitVsCodeMessage({
-                  type: "configUpdateFailed",
-                  message: "Failed to update config in emulator."
+                  type: "autocompleteSettingsLoaded",
+                  settings: {
+                    enableAutoTrigger: false,
+                    enableSmartInlineTaskKeybinding: false,
+                    enableChatAutocomplete: false,
+                    provider: null,
+                    model: null,
+                  },
+                })
+                break
+
+              case "requestNotificationSettings":
+                emitVsCodeMessage({
+                  type: "notificationSettingsLoaded",
+                  settings: {
+                    attentionEnabled: true,
+                    attentionSound: "default",
+                  },
                 } as any)
-              }
-              break
+                break
 
-            // ── Memory ──
+              case "testNotification":
+                console.log("[Emulator] testNotification received. Sound:", msg.sound)
+                try {
+                  if (msg.sound === "default") {
+                    msg.sound = "alert-06" // Or whatever default is
+                  }
+                  const url = new URL(`../../ui/src/assets/audio/${msg.sound}.mp3`, import.meta.url).href
+                  const audio = new Audio(url)
+                  audio.play().catch(e => console.error("[Emulator] Failed to play audio:", e))
+                } catch (e) { }
+                break
 
-            case "requestIndexingStatus":
-              try {
-                const { data: status } = await client.indexing.status({ directory: directory || undefined }, { throwOnError: true })
-                emitVsCodeMessage({ type: "indexingStatusLoaded", status } as any)
-              } catch (e) {
-                console.error("[Emulator] Failed to request indexing status:", e)
-              }
-              break
+              case "requestKiloEmbeddingModels":
+                emitVsCodeMessage({
+                  type: "kiloEmbeddingModelsLoaded",
+                  catalog: { defaultModel: "", models: [], aliases: {} } as any,
+                })
+                break
 
-            case "requestIndexingSettings":
-              emitVsCodeMessage({
-                type: "indexingSettingsLoaded",
-                settings: { showButtonWhenDisabled: true },
-              })
-              break
+              case "requestSkills":
+                emitVsCodeMessage({
+                  type: "skillsLoaded",
+                  skills: [] as any,
+                })
+                break
 
-            case "requestFileSearch":
-              try {
-                const query = msg.query
-                const [fileRes, folderRes] = await Promise.all([
-                  client.find.files({ query, directory: directory || undefined, type: "file", limit: 50 }).catch(() => ({ data: [] })),
-                  client.find.files({ query, directory: directory || undefined, type: "directory", limit: 50 }).catch(() => ({ data: [] }))
-                ])
-                const files = fileRes.data || []
-                const folders = folderRes.data || []
-                
-                const items: any[] = []
-                for (const f of folders) {
-                  items.push({ path: f, type: "folder" })
+              case "requestVariants":
+                emitVsCodeMessage({
+                  type: "variantsLoaded",
+                  variants: (settings.variants as any) || {},
+                })
+                break
+
+              case "requestModelSelections":
+                emitVsCodeMessage({
+                  type: "modelSelectionsLoaded",
+                  selections: (settings.modelSelections as any) || {},
+                })
+                break
+
+              case "requestRecents":
+                emitVsCodeMessage({
+                  type: "recentsLoaded",
+                  recents: (settings.recents as any) || [],
+                })
+                break
+
+              case "requestFavorites":
+                emitVsCodeMessage({
+                  type: "favoritesLoaded",
+                  favorites: [],
+                })
+                break
+
+              // ── Core chat operations ──
+
+              case "sendMessage":
+                await handleSendMessage(msg)
+                break
+
+              case "sendCommand":
+                await handleSendCommand(msg)
+                break
+
+              case "abort":
+                await handleAbort(msg)
+                break
+
+              case "reload":
+                window.location.reload()
+                break
+
+              case "loadMessages":
+                await handleLoadMessages(msg)
+                break
+
+              case "createSession":
+                await handleCreateSession()
+                break
+
+              case "clearSession":
+                currentSessionID = null
+                break
+
+              case "deleteSession":
+                await handleDeleteSession(msg)
+                break
+
+              // ── Session management ──
+
+              case "syncSession":
+                // Track the child session for events - messages will come via SSE
+                if (msg.sessionID) {
+                  await handleLoadMessages({
+                    sessionID: msg.sessionID,
+                    mode: "replace",
+                  })
                 }
-                for (const f of files) {
-                  items.push({ path: f, type: "file" })
-                }
-                
-                emitVsCodeMessage({
-                  type: "fileSearchResult",
-                  paths: files,
-                  items,
-                  dir: directory,
-                  requestId: msg.requestId
-                } as any)
-              } catch (e) {
-                console.error("[Emulator] Failed to request file search:", e)
-                emitVsCodeMessage({
-                  type: "fileSearchResult",
-                  paths: [],
-                  items: [],
-                  dir: directory,
-                  requestId: msg.requestId
-                } as any)
-              }
-              break
+                break
 
-            case "requestSandboxDefault":
-              try {
-                const { data: status } = await client.sandbox.support({ directory }, { throwOnError: true })
+              case "selectSession":
+                if (msg.sessionID) {
+                  currentSessionID = msg.sessionID
+                }
+                break
+
+              // ── Agent / model selection ──
+
+              case "selectAgent":
+                selectedAgent = msg.agent
+                settings.selectedAgent = msg.agent
+                saveSettings(settings)
+                break
+
+              case "selectModel":
+                // Model selection is sent per-message, just acknowledge
+                break
+
+              case "persistModelSelectorExpanded":
+                // No-op in web context
+                break
+
+              // ── Permissions / questions ──
+
+              case "permissionResponse":
+                await handlePermissionResponse(msg)
+                break
+
+              case "questionReply":
+                await handleQuestionReply(msg)
+                break
+
+              case "questionReject":
+                await handleQuestionReject(msg)
+                break
+
+              // ── Session operations ──
+
+              case "revertSession":
+                await handleRevertSession(msg)
+                break
+
+              case "renameSession":
+                await handleRenameSession(msg)
+                break
+
+              case "sidebar.openSessions":
+                // Handled entirely by the web UI, nothing to do here
+                break
+
+              case "unrevertSession":
+                try {
+                  await (client.session as any).unrevert({
+                    sessionID: msg.sessionID,
+                    directory,
+                  })
+                } catch (e) {
+                  console.error("[Emulator] Failed to unrevert:", e)
+                }
+                break
+
+              // ── File operations (no-ops in web context) ──
+
+              case "openFile":
+              case "openDiffVirtual":
+              case "openExternal":
+              case "openContent":
+              case "saveImage":
+              case "validateFiles":
+                if (msg.type === "openFile" && msg.filePath) {
+                  window.dispatchEvent(new CustomEvent("openFileDrawer", { detail: { filePath: msg.filePath, line: msg.line, column: msg.column } }))
+                }
+                if (msg.type === "openExternal" && msg.url) {
+                  window.open(msg.url, "_blank")
+                }
+                if (msg.type === "validateFiles" && msg.id) {
+                  // Can't validate files in web context, return empty
+                  emitVsCodeMessage({
+                    type: "validateFilesResult",
+                    id: msg.id,
+                    existing: [],
+                  } as any)
+                }
+                break
+
+              // ── Config updates ──
+
+              case "updateConfig":
+                try {
+                  // Global config (no directory)
+                  if (msg.config && Object.keys(msg.config).length > 0) {
+                    await client.config.update({ config: msg.config })
+                  }
+                  // Project config
+                  if (directory && msg.projectConfig && Object.keys(msg.projectConfig).length > 0) {
+                    await client.config.update({ directory, config: msg.projectConfig })
+                  }
+
+                  // Fetch the updated config to return it to the UI
+                  const res = await client.config.overlay({ scope: "global" })
+                  const globalConfig = res.data ? (res.data as any).global ?? {} : {}
+                  const projRes = directory ? await client.config.overlay({ scope: "project", directory }) : null
+                  const projectConfig = projRes && projRes.data ? (projRes.data as any).project ?? {} : {}
+
+                  console.log("[Emulator] Saved configs to:", {
+                    global: (res.data as any)?.targets?.global?.file || "unknown",
+                    project: (projRes?.data as any)?.targets?.project?.file || "none"
+                  })
+
+                  emitVsCodeMessage({
+                    type: "configUpdated",
+                    config: globalConfig,
+                    globalConfig: globalConfig,
+                    projectConfig: projectConfig,
+                    features: { indexing: true, sandboxControls: true }
+                  } as any)
+                } catch (e) {
+                  console.error("[Emulator] Failed to update config:", e)
+                  emitVsCodeMessage({
+                    type: "configUpdateFailed",
+                    message: "Failed to update config in emulator."
+                  } as any)
+                }
+                break
+
+              // ── Memory ──
+
+              case "requestIndexingStatus":
+                try {
+                  const { data: status } = await client.indexing.status({ directory: directory || undefined }, { throwOnError: true })
+                  emitVsCodeMessage({ type: "indexingStatusLoaded", status } as any)
+                } catch (e) {
+                  console.error("[Emulator] Failed to request indexing status:", e)
+                }
+                break
+
+              case "requestIndexingSettings":
+                emitVsCodeMessage({
+                  type: "indexingSettingsLoaded",
+                  settings: { showButtonWhenDisabled: true },
+                })
+                break
+
+              case "requestFileSearch":
+                try {
+                  const query = msg.query
+                  const [fileRes, folderRes] = await Promise.all([
+                    client.find.files({ query, directory: directory || undefined, type: "file", limit: 50 }).catch(() => ({ data: [] })),
+                    client.find.files({ query, directory: directory || undefined, type: "directory", limit: 50 }).catch(() => ({ data: [] }))
+                  ])
+                  const files = fileRes.data || []
+                  const folders = folderRes.data || []
+
+                  const items: any[] = []
+                  for (const f of folders) {
+                    items.push({ path: f, type: "folder" })
+                  }
+                  for (const f of files) {
+                    items.push({ path: f, type: "file" })
+                  }
+
+                  emitVsCodeMessage({
+                    type: "fileSearchResult",
+                    paths: files,
+                    items,
+                    dir: directory,
+                    requestId: msg.requestId
+                  } as any)
+                } catch (e) {
+                  console.error("[Emulator] Failed to request file search:", e)
+                  emitVsCodeMessage({
+                    type: "fileSearchResult",
+                    paths: [],
+                    items: [],
+                    dir: directory,
+                    requestId: msg.requestId
+                  } as any)
+                }
+                break
+
+              case "requestSandboxDefault":
+                try {
+                  const { data: status } = await client.sandbox.support({ directory }, { throwOnError: true })
+                  emitVsCodeMessage({
+                    type: "sandboxDefaultStatus",
+                    desired: true,
+                    enabled: status.available,
+                    available: status.available,
+                    reason: status.reason,
+                  } as any)
+                } catch (e) {
+                  console.error("[Emulator] Failed to request sandbox default status:", e)
+                }
+                break
+
+              case "setSandboxDefault":
                 emitVsCodeMessage({
                   type: "sandboxDefaultStatus",
-                  desired: true,
-                  enabled: status.available,
-                  available: status.available,
-                  reason: status.reason,
-                } as any)
-              } catch (e) {
-                console.error("[Emulator] Failed to request sandbox default status:", e)
-              }
-              break
-
-            case "setSandboxDefault":
-              emitVsCodeMessage({
-                type: "sandboxDefaultStatus",
-                desired: msg.enabled,
-                enabled: msg.enabled,
-                available: true,
-                reason: undefined,
-                revision: 1,
-                requestID: msg.requestID,
-              })
-              break
-
-            case "toggleSandbox":
-              try {
-                const sid = msg.sessionID || currentSessionID
-                if (sid && sid !== "{sessionID}") {
-                  const { data } = await client.sandbox.toggle({ sessionID: sid, directory }, { throwOnError: true })
-                  emitVsCodeMessage({
-                    type: "sandboxStatus",
-                    sessionID: sid,
-                    revision: 1,
-                    ...data,
-                    requestID: msg.requestID
-                  } as any)
-                }
-              } catch (e) {
-                console.error("[Emulator] Failed to toggle sandbox:", e)
-              }
-              break
-
-            case "requestImageModels":
-              emitVsCodeMessage({ type: "imageModelsLoaded", models: [] } as any)
-              break
-
-            case "requestMcpStatus":
-              try {
-                const { data: status } = await client.mcp.status({ directory }, { throwOnError: true })
-                emitVsCodeMessage({ type: "mcpStatusLoaded", status } as any)
-              } catch (e) {
-                console.error("[Emulator] Failed to request MCP status:", e)
-              }
-              break
-
-            case "requestSandboxStatus":
-              try {
-                const sid = msg.sessionID || currentSessionID
-                if (!sid || sid === "{sessionID}") {
-                  emitVsCodeMessage({ type: "sandboxStatus", sessionID: sid, status: { enabled: false } } as any)
-                  break
-                }
-                const { data: status } = await client.sandbox.status({ sessionID: sid, directory }, { throwOnError: true })
-                emitVsCodeMessage({ type: "sandboxStatus", sessionID: sid, status } as any)
-              } catch (e) {
-                console.error("[Emulator] Failed to request sandbox status:", e)
-              }
-              break
-
-            case "requestSessionModelUsage":
-              if (msg.sessionID && msg.sessionID !== "{sessionID}") {
-                try {
-                  const { data: usage } = await client.kilocode.sessionModelUsage({ sessionID: msg.sessionID, directory }, { throwOnError: true })
-                  emitVsCodeMessage({ type: "sessionModelUsageLoaded", sessionID: msg.sessionID, requestID: msg.requestID, data: usage } as any)
-                } catch (e) {
-                  console.error("[Emulator] Failed to request session model usage:", e)
-                }
-              }
-              break
-
-            case "updateSetting":
-              try {
-                settings[msg.key] = msg.value
-                saveSettings(settings)
-                if (msg.key === "showTaskTimeline") {
-                  emitVsCodeMessage({
-                    type: "timelineSettingLoaded",
-                    visible: msg.value !== false,
-                  } as any)
-                }
-              } catch (e) {
-                console.error("[Emulator] Failed to update setting:", e)
-              }
-              break
-
-            case "compact":
-              if (msg.sessionID) {
-                console.warn("[Emulator] Session compaction is not supported in the emulator environment.")
-              }
-              break
-
-            case "requestMemory":
-              try {
-                const memRes = await (client as any).memory.status({
-                  directory,
+                  desired: msg.enabled,
+                  enabled: msg.enabled,
+                  available: true,
+                  reason: undefined,
+                  revision: 1,
+                  requestID: msg.requestID,
                 })
+                break
+
+              case "toggleSandbox":
+                try {
+                  const sid = msg.sessionID || currentSessionID
+                  if (sid && sid !== "{sessionID}") {
+                    const { data } = await client.sandbox.toggle({ sessionID: sid, directory }, { throwOnError: true })
+                    emitVsCodeMessage({
+                      type: "sandboxStatus",
+                      sessionID: sid,
+                      revision: 1,
+                      ...data,
+                      requestID: msg.requestID
+                    } as any)
+                  }
+                } catch (e) {
+                  console.error("[Emulator] Failed to toggle sandbox:", e)
+                }
+                break
+
+              case "requestImageModels":
+                emitVsCodeMessage({ type: "imageModelsLoaded", models: [] } as any)
+                break
+
+              case "requestMcpStatus":
+                try {
+                  const { data: status } = await client.mcp.status({ directory }, { throwOnError: true })
+                  emitVsCodeMessage({ type: "mcpStatusLoaded", status } as any)
+                } catch (e) {
+                  console.error("[Emulator] Failed to request MCP status:", e)
+                }
+                break
+
+              case "requestSandboxStatus":
+                try {
+                  const sid = msg.sessionID || currentSessionID
+                  if (!sid || sid === "{sessionID}") {
+                    emitVsCodeMessage({ type: "sandboxStatus", sessionID: sid, status: { enabled: false } } as any)
+                    break
+                  }
+                  const { data: status } = await client.sandbox.status({ sessionID: sid, directory }, { throwOnError: true })
+                  emitVsCodeMessage({ type: "sandboxStatus", sessionID: sid, status } as any)
+                } catch (e) {
+                  console.error("[Emulator] Failed to request sandbox status:", e)
+                }
+                break
+
+              case "requestSessionModelUsage":
+                if (msg.sessionID && msg.sessionID !== "{sessionID}") {
+                  try {
+                    const { data: usage } = await client.kilocode.sessionModelUsage({ sessionID: msg.sessionID, directory }, { throwOnError: true })
+                    emitVsCodeMessage({ type: "sessionModelUsageLoaded", sessionID: msg.sessionID, requestID: msg.requestID, data: usage } as any)
+                  } catch (e) {
+                    console.error("[Emulator] Failed to request session model usage:", e)
+                  }
+                }
+                break
+
+              case "updateSetting":
+                try {
+                  settings[msg.key] = msg.value
+                  saveSettings(settings)
+                  if (msg.key === "showTaskTimeline") {
+                    emitVsCodeMessage({
+                      type: "timelineSettingLoaded",
+                      visible: msg.value !== false,
+                    } as any)
+                  }
+                } catch (e) {
+                  console.error("[Emulator] Failed to update setting:", e)
+                }
+                break
+
+              case "compact":
+                if (msg.sessionID) {
+                  console.warn("[Emulator] Session compaction is not supported in the emulator environment.")
+                }
+                break
+
+              case "requestMemory":
+                try {
+                  const memRes = await (client as any).memory.status({
+                    directory,
+                  })
+                  emitVsCodeMessage({
+                    type: "memoryLoaded",
+                    status: memRes.data,
+                  } as any)
+                } catch {
+                  emitVsCodeMessage({
+                    type: "memoryLoaded",
+                    status: { enabled: false },
+                  } as any)
+                }
+                break
+
+              case "enhancePrompt":
+                void handleEnhancePrompt(msg)
+                break
+
+              // ── Git status ──
+
+              case "requestGitStatus":
                 emitVsCodeMessage({
-                  type: "memoryLoaded",
-                  status: memRes.data,
+                  type: "gitStatus",
+                  repo: false,
                 } as any)
-              } catch {
-                emitVsCodeMessage({
-                  type: "memoryLoaded",
-                  status: { enabled: false },
-                } as any)
+                break
+
+              case "requestAutoApproveState":
+                emitVsCodeMessage({ type: "autoApproveState", active: autoApproveEnabled } as any)
+                break
+
+              case "toggleAutoApprove":
+                autoApproveEnabled = !autoApproveEnabled
+                emitVsCodeMessage({ type: "autoApproveState", active: autoApproveEnabled } as any)
+                break
+
+              case "streamSessionVisible":
+                break
+
+              case "openSubAgentViewer":
+                await handleOpenSubAgentViewer(msg)
+                break
+
+              case "openSettingsPanel":
+              case "openSettingsTab":
+                window.parent.postMessage({ type: 'navigateZaraCli', path: msg.tab ? `/console/settings/${msg.tab}` : '/console/settings' }, "*")
+                break
+              case "persistModelSelection": {
+                const modelSelections = (settings.modelSelections as Record<string, { providerID: string, modelID: string }>) || {}
+                modelSelections[msg.agent] = { providerID: msg.providerID, modelID: msg.modelID }
+                settings.modelSelections = modelSelections
+                saveSettings(settings)
+                break
               }
-              break
+              case "clearModelSelection": {
+                const modelSelections = (settings.modelSelections as Record<string, { providerID: string, modelID: string }>) || {}
+                delete modelSelections[msg.agent]
+                settings.modelSelections = modelSelections
+                saveSettings(settings)
+                break
+              }
 
-            case "enhancePrompt":
-              void handleEnhancePrompt(msg)
-              break
+              case "persistVariant": {
+                const variants = (settings.variants as Record<string, string>) || {}
+                variants[msg.key] = msg.value
+                settings.variants = variants
+                saveSettings(settings)
+                break
+              }
 
-            // ── Git status ──
+              case "persistRecents":
+                try {
+                  settings.recents = msg.recents
+                  saveSettings(settings)
+                } catch (e) {
+                  console.error("[Emulator] Failed to persist recents:", e)
+                }
+                break
 
-            case "requestGitStatus":
-              emitVsCodeMessage({
-                type: "gitStatus",
-                repo: false,
-              } as any)
-              break
+              case "suggestionAccept":
+                await handleSuggestionAccept(msg)
+                break
 
-            case "requestAutoApproveState":
-              emitVsCodeMessage({ type: "autoApproveState", active: autoApproveEnabled } as any)
-              break
+              case "suggestionDismiss":
+                await handleSuggestionDismiss(msg)
+                break
 
-            case "toggleAutoApprove":
-              autoApproveEnabled = !autoApproveEnabled
-              emitVsCodeMessage({ type: "autoApproveState", active: autoApproveEnabled } as any)
-              break
+              case "openAgentManager":
+                window.parent.postMessage({ type: 'navigateZaraCli', path: '/console/settings/agents' }, "*")
+                break
 
-             case "streamSessionVisible":
-               break
+              case "telemetry":
+              case "settingsTabChanged":
+              case "login":
+              case "refreshProfile":
+                // No-op in emulator context
+                break
 
-             case "openSubAgentViewer":
-               await handleOpenSubAgentViewer(msg)
-               break
+              case "requestBrowserSettings":
+                window.postMessage({
+                  type: "browserSettingsLoaded",
+                  settings: {
+                    enabled: false,
+                    useSystemChrome: true,
+                    headless: false,
+                  }
+                }, "*")
+                break
 
-             case "openSettingsPanel":
-             case "openSettingsTab":
-               window.parent.postMessage({ type: 'navigateZaraCli', path: msg.tab ? `/console/settings/${msg.tab}` : '/console/settings' }, "*")
-               break
-             case "persistModelSelection": {
-               const modelSelections = (settings.modelSelections as Record<string, { providerID: string, modelID: string }>) || {}
-               modelSelections[msg.agent] = { providerID: msg.providerID, modelID: msg.modelID }
-               settings.modelSelections = modelSelections
-               saveSettings(settings)
-               break
-             }
-             case "clearModelSelection": {
-               const modelSelections = (settings.modelSelections as Record<string, { providerID: string, modelID: string }>) || {}
-               delete modelSelections[msg.agent]
-               settings.modelSelections = modelSelections
-               saveSettings(settings)
-               break
-             }
+              case "openConfigFile":
+                window.parent.postMessage({ type: 'navigateZaraCli', path: '/console/settings/sources' }, "*")
+                break
 
-             case "persistVariant": {
-               const variants = (settings.variants as Record<string, string>) || {}
-               variants[msg.key] = msg.value
-               settings.variants = variants
-               saveSettings(settings)
-               break
-             }
+              case "requestClaudeCompatSetting":
+                window.postMessage({ type: "claudeCompatSettingLoaded", enabled: false }, "*")
+                break
 
-             case "persistRecents":
-               try {
-                 settings.recents = msg.recents
-                 saveSettings(settings)
-               } catch (e) {
-                 console.error("[Emulator] Failed to persist recents:", e)
-               }
-               break
+              case "openMarketplacePanel":
+                window.postMessage({ type: "navigate", view: "marketplace" }, "*")
+                break
 
-             case "suggestionAccept":
-               await handleSuggestionAccept(msg)
-               break
+              case "fetchMarketplaceData": {
+                const fetchMarket = async (url: string, type: "mcp" | "agent") => {
+                  try {
+                    const res = await fetch(url)
+                    const text = await res.text()
+                    let parsed: any
+                    try { parsed = JSON.parse(text) } catch { parsed = parseYaml(text) }
+                    const items = Array.isArray(parsed?.items) ? parsed.items : []
+                    return items.map((i: any) => ({ ...i, type }))
+                  } catch {
+                    return []
+                  }
+                }
 
-             case "suggestionDismiss":
-               await handleSuggestionDismiss(msg)
-               break
+                Promise.all([
+                  fetchMarket("https://api.kilo.ai/api/marketplace/mcps", "mcp"),
+                  fetchMarket("https://api.kilo.ai/api/marketplace/agents", "agent")
+                ]).then(([mcps, agents]) => {
+                  const items = [...mcps, ...agents]
+                  const globalState: Record<string, any> = {}
+                  for (const id of mockMarketplaceInstalled) {
+                    globalState[id] = { status: "installed" }
+                  }
+                  window.postMessage({
+                    type: "marketplaceData",
+                    marketplaceItems: items,
+                    marketplaceInstalledMetadata: { project: {}, global: globalState },
+                    marketplaceRelevance: { roots: [], data: {} },
+                    errors: [],
+                    showAgentMigrationBanner: false
+                  }, "*")
+                })
+                break
+              }
 
-             case "openAgentManager":
-               window.parent.postMessage({ type: 'navigateZaraCli', path: '/console/settings/agents' }, "*")
-               break
+              case "installMarketplaceItem":
+                if (msg.mpItem) {
+                  mockMarketplaceInstalled.add(msg.mpItem.id)
+                  window.postMessage({ type: "marketplaceInstallResult", success: true, slug: msg.mpItem.id }, "*")
+                  // Trigger refetch so UI updates
+                  window.postMessage({ type: "fetchMarketplaceData" }, "*")
+                }
+                break
 
-             case "telemetry":
-             case "settingsTabChanged":
-             case "login":
-             case "refreshProfile":
-               // No-op in emulator context
-               break
+              case "removeInstalledMarketplaceItem":
+                if (msg.mpItem) {
+                  mockMarketplaceInstalled.delete(msg.mpItem.id)
+                  window.postMessage({ type: "marketplaceRemoveResult", success: true, slug: msg.mpItem.id }, "*")
+                  // Trigger refetch so UI updates
+                  window.postMessage({ type: "fetchMarketplaceData" }, "*")
+                }
+                break
 
-             case "requestBrowserSettings":
-               window.postMessage({
-                 type: "browserSettingsLoaded",
-                 settings: {
-                   enabled: false,
-                   useSystemChrome: true,
-                   headless: false,
-                 }
-               }, "*")
-               break
+              case "dismissAgentMigrationBanner":
+                break
+              case "requestRemoteStatus":
+                window.postMessage({ type: "remoteStatus", enabled: false, connected: false }, "*")
+                break
 
-             case "openConfigFile":
-               window.parent.postMessage({ type: 'navigateZaraCli', path: '/console/settings/sources' }, "*")
-               break
-
-            default:
-              console.log(
-                "[Emulator] Unhandled message type:",
-                msg.type
-              )
+              default:
+                console.log(
+                  "[Emulator] Unhandled message type:",
+                  msg.type
+                )
+            }
+          } catch (e) {
+            console.error(
+              "[Emulator] Error handling message",
+              msg.type,
+              e
+            )
           }
-        } catch (e) {
-          console.error(
-            "[Emulator] Error handling message",
-            msg.type,
-            e
-          )
-        }
-      },
-      getState: () => undefined,
-      setState: () => {},
+        },
+        getState: () => undefined,
+        setState: () => { },
+      }
     }
-  }
 
   // Start the SSE event stream
   setupEventStream()

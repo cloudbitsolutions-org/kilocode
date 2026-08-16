@@ -73,7 +73,7 @@ export namespace KilocodeConfig {
     writable: (config: Config.Info) => Config.Info
   }) {
     const files = yield* projectConfigFiles(input)
-    const file = files.find((item) => existsSync(item)) ?? path.join(input.directory, ".kilo", "kilo.jsonc")
+    const file = files.find((item) => existsSync(item)) ?? path.join(input.directory, KILO_DIR_SUFFIXES[0], "kilo.jsonc")
     const source = yield* input.read(file)
     const before = source ?? "{}"
     const patch = input.writable(input.config)

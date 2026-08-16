@@ -40,9 +40,9 @@ export const InstallModal = (props: Props) => {
   const options = (): ScopeOption[] =>
     workspace()
       ? [
-          { value: "project", label: t("marketplace.scope.project") },
-          { value: "global", label: t("marketplace.scope.global") },
-        ]
+        { value: "project", label: t("marketplace.scope.project") },
+        { value: "global", label: t("marketplace.scope.global") },
+      ]
       : [{ value: "global", label: t("marketplace.scope.global") }]
   const initial = workspace() ? options()[0] : options()[0]
   const [scope, setScope] = createSignal<ScopeOption>(initial)
@@ -166,7 +166,7 @@ export const InstallModal = (props: Props) => {
   }
 
   return (
-    <Dialog title={t("marketplace.install.title", { name: props.item.name })} fit>
+    <Dialog title={t("marketplace.install.title", { name: props.item.name })}>
       <Show when={!result()}>
         <div class="install-modal-body">
           <div class="install-modal-about">

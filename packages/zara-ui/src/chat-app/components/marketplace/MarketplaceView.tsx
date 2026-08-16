@@ -19,7 +19,7 @@ import "./marketplace.css"
 const EMPTY_METADATA: MarketplaceInstalledMetadata = { project: {}, global: {} }
 const EMPTY_RELEVANCE: MarketplaceRelevanceMetadata = {}
 
-export const MarketplaceView = () => {
+export const MarketplaceView = (props: { onBack?: () => void }) => {
   const vscode = useVSCode()
   const server = useServer()
   const { t } = useLanguage()
@@ -144,7 +144,24 @@ export const MarketplaceView = () => {
   }
 
   return (
-    <div class="marketplace-view">
+    <div class="marketplace-view" style={{ display: "flex", "flex-direction": "column", height: "100%", "min-height": 0 }}>
+      <Show when={props.onBack}>
+        <div
+          style={{
+            padding: "12px 16px",
+            "border-bottom": "1px solid var(--border-weak-base)",
+            display: "flex",
+            "align-items": "center",
+            gap: "8px",
+          }}
+        >
+          <Button variant="ghost" size="small" icon="chevron-left" onClick={props.onBack} />
+          <h2 style={{ "font-size": "var(--kilo-font-size-16)", "font-weight": "600", margin: 0 }}>
+            {t("sidebar.topBar.marketplace") || "Marketplace"}
+          </h2>
+        </div>
+      </Show>
+
       <Show when={errors().length > 0}>
         {errors().map((err, idx) => (
           <Card variant="error" class="marketplace-error-banner">

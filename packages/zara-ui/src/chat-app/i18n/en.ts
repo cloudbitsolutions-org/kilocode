@@ -751,6 +751,7 @@ export const dict = {
   "sidebar.topBar.history": "History",
   "sidebar.topBar.agentManager": "Agent Manager",
   "sidebar.topBar.settings": "Settings",
+  "sidebar.topBar.marketplace": "Marketplace",
   "sidebar.menu.toggle": "Toggle menu",
   "sidebar.nav.projectsAndSessions": "Projects and sessions",
   "sidebar.settings": "Settings",
