@@ -1005,7 +1005,7 @@
     },
     "packages/zara-ui": {
       "name": "@kilocode/zara-ui",
-      "version": "7.4.22",
+      "version": "7.5.6",
       "dependencies": {
         "@kilocode/kilo-i18n": "workspace:*",
         "@kilocode/kilo-indexing": "workspace:*",
