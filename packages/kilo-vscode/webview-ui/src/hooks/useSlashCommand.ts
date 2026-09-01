@@ -76,7 +76,7 @@ export function useSlashCommand(
       hints: ["clear"],
       action: () => {
         window.dispatchEvent(new CustomEvent("newTaskRequest"))
-        window.postMessage({ type: "navigate", view: "newTask" }, "*")
+        window.postMessage({ type: "navigate", view: "newTask" }, window.origin)
       },
     },
     {
@@ -84,7 +84,7 @@ export function useSlashCommand(
       description: "Switch to another session",
       hints: ["resume", "continue", "history"],
       action: () => {
-        window.postMessage({ type: "navigate", view: "history" }, "*")
+        window.postMessage({ type: "navigate", view: "history" }, window.origin)
       },
     },
     {
@@ -155,6 +155,11 @@ export function useSlashCommand(
     { name: "review staged", description: "Review staged changes only", hints: [] },
     { name: "review unpushed", description: "Review local commits ahead of upstream", hints: [] },
     { name: "review branch", description: "Review current branch against base branch", hints: [] },
+    {
+      name: "review worktree",
+      description: "Review committed and uncommitted worktree changes against its base",
+      hints: [],
+    },
     {
       name: "review quick",
       description: "Fast single-pass review with minimal token usage",
@@ -243,7 +248,7 @@ export function useSlashCommand(
     vscode.postMessage({ type: "requestCommands" })
   }
 
-  const results = () => {
+  const matched = () => {
     const q = query()
     if (q === null) return []
     const list = commands()
@@ -275,6 +280,12 @@ export function useSlashCommand(
         cmd.hints.some((h) => h.toLowerCase().includes(lower)),
     )
     return sortByScore(matches, lower)
+  }
+
+  const results = () => {
+    const list = matched()
+    // PromptInput renders contiguous Actions and Commands groups, so keyboard indexes must use the same order.
+    return [...list.filter((cmd) => cmd.action), ...list.filter((cmd) => !cmd.action)]
   }
 
   const unsubscribe = vscode.onMessage((message) => {

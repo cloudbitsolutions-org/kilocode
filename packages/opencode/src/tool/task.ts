@@ -33,8 +33,7 @@ export interface TaskPromptOps {
 const id = "task"
 const BACKGROUND_DESCRIPTION = [
   "Background mode: background=true launches the subagent asynchronously and returns immediately.",
-  "Foreground is the default; use it when you need the result before continuing.",
-  "Use background only for independent work that can run while you continue elsewhere.",
+  "Use foreground when you need the result before proceeding; otherwise use background for non-overlapping work, but do not give the final answer until all required background results have arrived.", // kilocode_change
   "You will be notified automatically when it finishes.",
 ].join(" ")
 const BACKGROUND_STARTED = [
@@ -64,6 +63,7 @@ const BaseParameters = Schema.Struct(BaseParameterFields)
 
 export const Parameters = Schema.Struct({
   ...BaseParameterFields,
+  ...KiloTask.ModelFields, // kilocode_change
   background: Schema.optional(Schema.Boolean).annotate({
     description:
       "Run the agent in the background. You will be notified when it completes. DO NOT sleep, poll, or proactively check on its progress",
@@ -108,6 +108,7 @@ export const TaskTool = Tool.define(
       ctx: Tool.Context,
     ) {
       const cfg = yield* config.get()
+      const selection = cfg.experimental?.task_model_selection === true // kilocode_change
       const runInBackground = params.background === true
       if (runInBackground && !flags.experimentalBackgroundSubagents) {
         return yield* Effect.fail(new Error("Background subagents require KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true"))
@@ -165,6 +166,29 @@ export const TaskTool = Tool.define(
           new Error(`Cannot resume session ${params.task_id}: not a child of the current session`),
         ) // kilocode_change - prevent cross-session task resume
       }
+      // kilocode_change start
+      const msg = yield* MessageV2.get({ sessionID: ctx.sessionID, messageID: ctx.messageID }).pipe(
+        Effect.provideService(Database.Service, database),
+        Effect.orDie,
+      )
+      if (msg.info.role !== "assistant") return yield* Effect.fail(new Error("Not an assistant message"))
+      const source = { modelID: msg.info.modelID, providerID: msg.info.providerID }
+      const selected = yield* KiloTask.resolveModel({
+        name: next.name,
+        agent: next,
+        config: cfg,
+        parent: source,
+        variant: msg.info.variant,
+        workflow: KiloTask.workflow(ctx.extra),
+        provider,
+        enabled: selection,
+        selection: { model: params.model, provider: params.provider, variant: params.variant },
+        resume: session?.model,
+      })
+      const model = selected.model
+      const variant = selected.variant
+      const reasoning = msg.info.variant
+      // kilocode_change end
       // kilocode_change start — inherit edit/bash/MCP restrictions from calling agent
       const caller = yield* agent.get(ctx.agent)
       const rules = KiloTask.inherited({ caller, session: parent, mcp: cfg.mcp })
@@ -209,33 +233,11 @@ export const TaskTool = Tool.define(
       )
       // kilocode_change end
 
-      const msg = yield* MessageV2.get({ sessionID: ctx.sessionID, messageID: ctx.messageID }).pipe(
-        Effect.provideService(Database.Service, database),
-        Effect.orDie,
-      )
-      if (msg.info.role !== "assistant") return yield* Effect.fail(new Error("Not an assistant message"))
-
-      // kilocode_change start — prefer valid subagent overrides, safely inheriting when overrides go stale
-      const selected = yield* KiloTask.resolveModel({
-        name: next.name,
-        agent: next,
-        config: cfg,
-        parent: {
-          modelID: msg.info.modelID,
-          providerID: msg.info.providerID,
-        },
-        variant: msg.info.variant,
-        workflow: KiloTask.workflow(ctx.extra), // kilocode_change
-        provider,
-      })
-      const model = selected.model
-      const variant = selected.variant
-      // kilocode_change end
       const metadata = {
         parentSessionId: ctx.sessionID,
         sessionId: nextSession.id,
         model,
-        variant, // kilocode_change
+        ...(variant === undefined ? {} : { variant }), // kilocode_change
         ...(runInBackground ? { background: true } : {}),
       }
 
@@ -275,7 +277,13 @@ export const TaskTool = Tool.define(
             return yield* Effect.fail(new Error(`${errorMessage(result.info.error)}\n${resumeHint(nextSession.id)}`))
           }
           // kilocode_change end
-          return result.parts.findLast((item) => item.type === "text")?.text ?? ""
+          // kilocode_change start - ignore synthetic/ignored/empty text parts (e.g. the memory marker) when picking the task result (#13469)
+          return (
+            result.parts
+              .filter((item): item is MessageV2.TextPart => item.type === "text")
+              .findLast((item) => !item.synthetic && !item.ignored && item.text.length > 0)?.text ?? ""
+          )
+          // kilocode_change end
         },
         Effect.ensuring(KiloTaskBackgroundProcess.finish(nextSession.id)),
       ) // kilocode_change - transfer inherited processes when the child run ends
@@ -290,11 +298,17 @@ export const TaskTool = Tool.define(
           .prompt({
             sessionID: ctx.sessionID,
             agent: currentParent.agent ?? ctx.agent,
-            variant,
+            model: selection
+              ? currentParent.model
+                ? { providerID: currentParent.model.providerID, modelID: currentParent.model.id }
+                : source
+              : undefined,
+            variant: selection ? (currentParent.model?.variant ?? reasoning) : variant,
             parts: [
               {
                 type: "text",
                 synthetic: true,
+                metadata: { background: true },
                 text: renderOutput({
                   sessionID: nextSession.id,
                   state,
@@ -365,7 +379,10 @@ export const TaskTool = Tool.define(
       const foregroundCost = runInBackground
         ? undefined
         : yield* KiloCostPropagation.childCost(sessions, nextSession.id) // kilocode_change - snapshot before the foreground job starts
-      const info = yield* background.start({
+      // kilocode_change start
+      const start = KiloTask.start(background, (id) => ops.cancel(id), runInBackground ? notify : undefined)
+      const info = yield* start({
+        // kilocode_change end
         id: nextSession.id,
         type: id,
         title: params.description,
@@ -399,13 +416,10 @@ export const TaskTool = Tool.define(
         }
       }
 
-      if (runInBackground) {
-        yield* notify(info.id)
-        return backgroundResult()
-      }
+      if (runInBackground) return backgroundResult() // kilocode_change
 
       const runCancel = yield* EffectBridge.make()
-      const cancel = ops.cancel(nextSession.id)
+      const cancel = KiloTask.cancelForeground(background, nextSession.id, ops.cancel(nextSession.id)) // kilocode_change
 
       function onAbort() {
         runCancel.fork(cancel)
@@ -437,7 +451,11 @@ export const TaskTool = Tool.define(
         (costBefore, exit) =>
           Effect.gen(function* () {
             if (Exit.hasInterrupts(exit))
-              yield* Effect.all([cancel, background.cancel(nextSession.id)], { discard: true })
+              yield* KiloTask.cancelForeground(
+                background,
+                nextSession.id,
+                Effect.all([cancel, background.cancel(nextSession.id)], { discard: true }),
+              )
           }).pipe(
             Effect.ensuring(
               Effect.gen(function* () {
@@ -461,14 +479,29 @@ export const TaskTool = Tool.define(
       )
     })
 
-    return {
-      description: flags.experimentalBackgroundSubagents
-        ? [DESCRIPTION, BACKGROUND_DESCRIPTION].join("\n\n")
-        : DESCRIPTION,
-      parameters: Parameters,
-      jsonSchema: flags.experimentalBackgroundSubagents ? undefined : ToolJsonSchema.fromSchema(BaseParameters),
-      execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
-        run(params, ctx).pipe(Effect.orDie),
-    }
+    // kilocode_change start
+    return () =>
+      Effect.gen(function* () {
+        const cfg = yield* config.get()
+        const selection = cfg.experimental?.task_model_selection === true
+        return {
+          description: [
+            DESCRIPTION,
+            ...(flags.experimentalBackgroundSubagents ? [BACKGROUND_DESCRIPTION] : []),
+            ...(selection ? [KiloTask.modelDescription] : []),
+          ].join("\n\n"),
+          parameters: Parameters,
+          jsonSchema: ToolJsonSchema.fromSchema(
+            Schema.Struct({
+              ...BaseParameters.fields,
+              ...(flags.experimentalBackgroundSubagents ? { background: Parameters.fields.background } : {}),
+              ...(selection ? KiloTask.ModelFields : {}),
+            }),
+          ),
+          execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
+            run(params, ctx).pipe(Effect.scoped, Effect.orDie),
+        }
+      })
+    // kilocode_change end
   }),
 )

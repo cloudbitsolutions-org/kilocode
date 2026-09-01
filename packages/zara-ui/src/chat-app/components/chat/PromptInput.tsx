@@ -59,7 +59,7 @@ import {
 } from "../../utils/prompt-drafts"
 import { drafts, imageDrafts, reviewDrafts } from "../../utils/draft-store"
 import { ReviewComments } from "./ReviewComments"
-import { partReview, reviewBody } from "../../../../../kilo-vscode/src/shared/review-comments"
+import { partReview } from "../../../../../kilo-vscode/src/shared/review-comments"
 import { isEnterKeyCommitNotIme } from "../../utils/ime-enter"
 import { MEMORY_USAGE, parseMemoryCommand } from "../../utils/memory-command"
 import { useMemory } from "../../context/memory"
@@ -511,7 +511,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     const target = draftKey()
     if (!candidates.has(target)) return
 
-    const draft = failed.review ? reviewBody(failed.review, failed.text) : failed.text
+    const draft = failed.review
+      ? (partReview({ kilo: { review: failed.review } }, failed.text)?.body ?? failed.text)
+      : failed.text
     if (draft === undefined) return
     if (failed.review) replaceReviewComments(failed.review.comments)
     if (draft) {
