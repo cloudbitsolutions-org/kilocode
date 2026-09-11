@@ -7,8 +7,8 @@
  */
 
 import { createSignal, createMemo, createEffect, ParentComponent, Accessor } from "solid-js"
-import { I18nProvider } from "@kilocode/kilo-ui/context"
-import type { UiI18nKey, UiI18nParams } from "@kilocode/kilo-ui/context"
+import { I18nProvider, pluralCategory, pluralKey } from "@kilocode/kilo-ui/context"
+import type { UiI18nKey, UiI18nParams, UiI18nPluralKey } from "@kilocode/kilo-ui/context"
 import { dict as uiEn } from "@kilocode/kilo-ui/i18n/en"
 import { dict as uiZh } from "@kilocode/kilo-ui/i18n/zh"
 import { dict as uiZht } from "@kilocode/kilo-ui/i18n/zht"
@@ -200,6 +200,9 @@ export const LanguageProvider: ParentComponent<LanguageProviderProps> = (props) 
     return resolveTemplate(text, params)
   }
 
+  const plural = (key: UiI18nPluralKey, count: number, params?: UiI18nParams) =>
+    t(pluralKey(key, pluralCategory(locale(), count)) as UiI18nKey, { ...params, count })
+
   const setLocale = (next: Locale | "") => {
     setUserOverride(next)
     vscode.postMessage({ type: "setLanguage", locale: next })
@@ -209,7 +212,7 @@ export const LanguageProvider: ParentComponent<LanguageProviderProps> = (props) 
     <LanguageContext.Provider
       value={{ locale, setLocale, userOverride, t: t as (key: string, params?: UiI18nParams) => string }}
     >
-      <I18nProvider value={{ locale: () => locale(), t }}>{props.children}</I18nProvider>
+      <I18nProvider value={{ locale: () => locale(), t, plural }}>{props.children}</I18nProvider>
     </LanguageContext.Provider>
   )
 }

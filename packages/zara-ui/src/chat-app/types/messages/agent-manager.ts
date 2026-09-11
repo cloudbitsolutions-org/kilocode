@@ -182,7 +182,7 @@ export interface LocalGitStats {
   behind: number
 }
 
-export type { ReviewCommentData as ReviewComment } from "../../../../../kilo-vscode/src/shared/review-comments"
+export type { ReviewCommentEntry as ReviewComment } from "../../../../../kilo-vscode/src/shared/review-comments"
 
 /**
  * Maximum number of parallel worktree versions for multi-version mode.

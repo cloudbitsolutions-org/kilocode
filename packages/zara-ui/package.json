@@ -21,7 +21,6 @@
     "@kilocode/kilo-web-ui": "workspace:*",
     "@kilocode/sdk": "workspace:*",
     "@kobalte/core": "0.13.11",
-    "@lottiefiles/dotlottie-web": "0.74.0",
     "@opencode-ai/ui": "workspace:*",
     "@pierre/diffs": "catalog:",
     "@solidjs/router": "catalog:",

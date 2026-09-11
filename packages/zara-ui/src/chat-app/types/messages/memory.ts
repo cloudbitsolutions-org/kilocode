@@ -12,7 +12,6 @@ import type {
 } from "@kilocode/sdk/v2"
 import type {
   MemoryOperation as SharedMemoryOperation,
-  MemoryPromptOperation as SharedMemoryPromptOperation,
 } from "@kilocode/kilo-memory/commands"
 import type { MemorySchema } from "@kilocode/kilo-memory/schema"
 
@@ -22,7 +21,7 @@ export type MemoryOperation = SharedMemoryOperation
 
 export type MemoryResultOperation = MemoryOperation
 
-export type MemoryPromptOperation = SharedMemoryPromptOperation
+export type MemoryPromptOperation = SharedMemoryOperation
 
 export type MemoryOperationResponse =
   | MemoryEnableResponse

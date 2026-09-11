@@ -242,7 +242,7 @@ interface SessionContextValue {
   // Thinking variant for the selected model
   variantList: (sessionID?: string) => string[]
   currentVariant: (sessionID?: string) => string | undefined
-  selectVariant: (value: string, sessionID?: string) => void
+  selectVariant: (value: string | undefined, sessionID?: string) => void
 
   // Model favorites
   favoriteModels: Accessor<ModelSelection[]>
@@ -892,13 +892,14 @@ export const SessionProvider: ParentComponent = (props) => {
     return getVariant(store.variantSelections, sel, list, agentForScope(sid), sid)
   }
 
-  const selectVariant = (value: string, sessionID?: string) => {
+  const selectVariant = (value: string | undefined, sessionID?: string) => {
     const sid = sessionID ?? currentSessionID()
     const sel = selected(sid)
     if (!sel) return
     const key = variantKey(sel, agentForScope(sid), sid)
-    setStore("variantSelections", key, value)
-    if (!sid) vscode.postMessage({ type: "persistVariant", key, value })
+    const next = value ?? ""
+    setStore("variantSelections", key, next)
+    if (!sid) vscode.postMessage({ type: "persistVariant", key, value: next })
   }
 
   // Load persisted variants from extension globalState

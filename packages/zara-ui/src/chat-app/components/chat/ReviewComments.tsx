@@ -9,6 +9,7 @@ import { useLanguage } from "../../context/language"
 import { useVSCode } from "../../context/vscode"
 import { useWorktreeMode } from "../../context/worktree-mode"
 import type { ReviewComment } from "../../types/messages"
+import { isCIReviewComment, isPRReviewComment } from "../../../../../kilo-vscode/src/shared/review-comments"
 import { fileName } from "./prompt-input-utils"
 
 interface ReviewCommentsProps {
@@ -24,21 +25,39 @@ export const ReviewComments: Component<ReviewCommentsProps> = (props) => {
   const vscode = useVSCode()
   const worktree = useWorktreeMode()
   const dialog = useDialog()
-  const side = (item: ReviewComment) => (item.side === "deletions" ? "-" : "+")
-  const title = (item: ReviewComment) => `${fileName(item.file)} ${side(item)}${item.line}`
+
+  const author = (item: ReviewComment) => (isPRReviewComment(item) ? item.author : "")
+  const side = (item: ReviewComment) =>
+    isPRReviewComment(item) || isCIReviewComment(item) ? "" : item.side === "deletions" ? "-" : "+"
+  const line = (item: ReviewComment) => (!isCIReviewComment(item) && item.line ? `${side(item)}${item.line}` : "")
+  const body = (item: ReviewComment) =>
+    isPRReviewComment(item) || isCIReviewComment(item) ? item.body : item.comment
+  const snippet = (item: ReviewComment) => {
+    if (isCIReviewComment(item)) return undefined
+    return isPRReviewComment(item) ? item.diffHunk : item.selectedText
+  }
+  const file = (item: ReviewComment) => (isCIReviewComment(item) ? undefined : item.file)
+  const label = (item: ReviewComment) => {
+    if (isCIReviewComment(item)) return item.title
+    return item.file ? fileName(item.file) : `@${author(item)}`
+  }
+  const title = (item: ReviewComment) => `${label(item)} ${line(item)}`.trim()
 
   const open = (item: ReviewComment) => {
+    const filePath = file(item)
+    if (!filePath) return
+    const fileLine = isCIReviewComment(item) ? undefined : item.line
     if (worktree && props.sessionID) {
       vscode.postMessage({
         type: "agentManager.openFile",
         sessionId: props.sessionID,
-        filePath: item.file,
-        line: item.line,
+        filePath,
+        line: fileLine,
       })
       dialog.close()
       return
     }
-    vscode.postMessage({ type: "openFile", filePath: item.file, line: item.line, column: 1 })
+    vscode.postMessage({ type: "openFile", filePath, line: fileLine, column: 1 })
     dialog.close()
   }
 
@@ -48,28 +67,34 @@ export const ReviewComments: Component<ReviewCommentsProps> = (props) => {
         <div class="prompt-review-modal">
           <div class="prompt-review-modal-head">
             <span class="prompt-review-modal-headline">{title(item)}</span>
-            <Tooltip value={language.t("agentManager.diff.openFile")} placement="top">
-              <IconButton
-                icon="go-to-file"
-                size="small"
-                variant="ghost"
-                label={language.t("agentManager.diff.openFile")}
-                onClick={() => open(item)}
-              />
-            </Tooltip>
+            <Show when={file(item)}>
+              <Tooltip value={language.t("agentManager.diff.openFile")} placement="top">
+                <IconButton
+                  icon="go-to-file"
+                  size="small"
+                  variant="ghost"
+                  label={language.t("agentManager.diff.openFile")}
+                  onClick={() => open(item)}
+                />
+              </Tooltip>
+            </Show>
           </div>
 
           <div class="prompt-review-modal-grid">
-            <span class="prompt-review-modal-label">{language.t("agentManager.review.metaFile")}</span>
-            <code class="prompt-review-modal-value">{item.file}</code>
-            <span class="prompt-review-modal-label">{language.t("agentManager.review.metaLine")}</span>
-            <span class="prompt-review-modal-value">L{item.line}</span>
+            <Show when={file(item)}>
+              <span class="prompt-review-modal-label">{language.t("agentManager.review.metaFile")}</span>
+              <code class="prompt-review-modal-value">{file(item)}</code>
+            </Show>
+            <Show when={line(item)}>
+              <span class="prompt-review-modal-label">{language.t("agentManager.review.metaLine")}</span>
+              <span class="prompt-review-modal-value">{line(item)}</span>
+            </Show>
             <span class="prompt-review-modal-label">{language.t("agentManager.review.metaComment")}</span>
-            <span class="prompt-review-modal-value">{item.comment}</span>
+            <span class="prompt-review-modal-value">{body(item)}</span>
           </div>
 
-          <Show when={item.selectedText}>
-            <pre class="prompt-review-modal-snippet">{item.selectedText}</pre>
+          <Show when={snippet(item)}>
+            <pre class="prompt-review-modal-snippet">{snippet(item)}</pre>
           </Show>
         </div>
       </Dialog>
@@ -102,11 +127,10 @@ export const ReviewComments: Component<ReviewCommentsProps> = (props) => {
                 </span>
                 <span class="prompt-review-chip-copy">
                   <span class="prompt-review-chip-main">
-                    <span class="prompt-review-chip-title">{fileName(item.file)}</span>
-                    <span class="prompt-review-chip-line">
-                      {side(item)}
-                      {item.line}
-                    </span>
+                    <span class="prompt-review-chip-title">{label(item)}</span>
+                    <Show when={line(item)}>
+                      <span class="prompt-review-chip-line">{line(item)}</span>
+                    </Show>
                   </span>
                 </span>
               </button>

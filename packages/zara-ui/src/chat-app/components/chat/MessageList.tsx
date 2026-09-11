@@ -191,7 +191,9 @@ export const MessageList: Component<MessageListProps> = (props) => {
       if (item) jump(item.key)
       return
     }
-    setSeek({ sid: session.currentSessionID(), count: session.messages().length })
+    const sid = session.currentSessionID()
+    if (!sid) return
+    setSeek({ sid, count: session.messages().length })
     session.loadOlderMessages()
   }
 

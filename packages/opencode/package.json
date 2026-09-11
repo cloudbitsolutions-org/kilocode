@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "7.5.6",
+  "version": "7.6.2",
   "name": "@kilocode/cli",
   "type": "module",
   "license": "MIT",
@@ -94,6 +94,7 @@
     "@clack/prompts": "1.0.0-alpha.1",
     "@effect/opentelemetry": "catalog:",
     "@effect/platform-node": "catalog:",
+    "@ff-labs/fff-bun": "0.9.4",
     "@gitlab/gitlab-ai-provider": "3.6.0",
     "@gitlab/opencode-gitlab-auth": "1.3.3",
     "@kilocode/kilo-gateway": "workspace:*",
@@ -110,9 +111,13 @@
     "@octokit/graphql": "9.0.2",
     "@octokit/rest": "catalog:",
     "@openauthjs/openauth": "catalog:",
+    "@opencode-ai/codemode": "workspace:*",
     "@opencode-ai/llm": "workspace:*",
+    "@opencode-ai/protocol": "workspace:*",
+    "@opencode-ai/schema": "workspace:*",
     "@opencode-ai/script": "workspace:*",
     "@opencode-ai/server": "workspace:*",
+    "@opencode-ai/tui": "workspace:*",
     "@opencode-ai/ui": "workspace:*",
     "@openrouter/ai-sdk-provider": "2.9.0",
     "@opentelemetry/api": "1.9.0",
@@ -183,12 +188,7 @@
     "xdg-basedir": "5.1.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "yargs": "18.0.0",
-    "zod": "catalog:",
-    "@ff-labs/fff-bun": "0.9.4",
-    "@opencode-ai/tui": "workspace:*",
-    "@opencode-ai/protocol": "workspace:*",
-    "@opencode-ai/schema": "workspace:*",
-    "@opencode-ai/codemode": "workspace:*"
+    "zod": "catalog:"
   },
   "overrides": {
     "drizzle-orm": "catalog:"
