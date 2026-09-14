@@ -2,7 +2,7 @@ import { Schema } from "effect"
 import type { MemorySchema } from "../schema"
 import { MemoryLog } from "./log"
 
-export namespace MemoryEvents {
+export namespace MemoryEffectEvents {
   const Metric = Schema.Struct({
     bytes: Schema.Number,
     estimatedTokens: Schema.Number,
@@ -123,3 +123,5 @@ export namespace MemoryEvents {
     }
   }
 }
+
+export { MemoryEffectEvents as MemoryEvents }

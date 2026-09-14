@@ -1,6 +1,6 @@
 import { Cause, Effect } from "effect"
-import { MemoryTurn as TurnCore } from "@kilocode/kilo-memory/effect/turn"
-import { MemoryPaths } from "@kilocode/kilo-memory/effect/paths"
+import { MemoryEffectTurn as TurnCore } from "@kilocode/kilo-memory/effect/turn"
+import { MemoryEffectPaths as MemoryPaths } from "@kilocode/kilo-memory/effect/paths"
 import { MemoryRedact } from "@kilocode/kilo-memory/redact"
 import { MemoryService } from "@kilocode/kilo-memory/effect/service"
 import * as Log from "@opencode-ai/core/util/log"

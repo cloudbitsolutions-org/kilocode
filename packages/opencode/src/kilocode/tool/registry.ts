@@ -327,7 +327,13 @@ export namespace KiloToolRegistry {
    * disable / purge / rebuild via the MemoryEvents bus (subscribed in kilocode/bootstrap.ts). */
   export function memoryToolsEnabled(input: { ctx: MemoryPaths.Ctx }) {
     return Effect.gen(function* () {
-      const root = MemoryPaths.root({ ctx: input.ctx })
+      let root: string
+      try {
+        root = MemoryPaths.root({ ctx: input.ctx })
+      } catch (err) {
+        log.warn("MemoryPaths.root failed", { error: String(err) })
+        return false
+      }
       const cached = memoryEnabledCache.get(root)
       if (cached && cached.deadline > Date.now()) return cached.enabled
       const enabled = yield* Effect.tryPromise({

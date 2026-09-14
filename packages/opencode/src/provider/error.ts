@@ -38,6 +38,9 @@ function message(providerID: ProviderV2.ID, e: APICallError) {
     if (providerID.includes("github-copilot") && e.statusCode === 403) {
       return "Please reauthenticate with the copilot provider to ensure your credentials work properly with Kilo."
     }
+    if (providerID.includes("kilo") && (e.statusCode === 401 || e.statusCode === 403)) {
+      return "Kilo Gateway authentication required. Please log in to Kilo Gateway in Settings > Providers to use this model."
+    }
     // kilocode_change end
     const msg = e.message
     if (msg === "") {

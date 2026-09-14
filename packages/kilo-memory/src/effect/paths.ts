@@ -1,10 +1,10 @@
 import { homedir } from "os"
 import path from "path"
-import { MemoryPaths as Core } from "../storage/paths"
+import { MemoryStoragePaths as Core } from "../storage/paths"
 
 /** Context-bound paths over the pure core. The host data dir is injected at bootstrap so
  * the package does not hard-code the opencode global directory; defaults to XDG-style data storage. */
-export namespace MemoryPaths {
+export namespace MemoryEffectPaths {
   export type Ctx = Core.Ctx
   export type Files = Core.Files
   export type Identity = Core.Identity
@@ -31,3 +31,5 @@ export namespace MemoryPaths {
   export const files = Core.files
   export const source = Core.source
 }
+
+export { MemoryEffectPaths as MemoryPaths }

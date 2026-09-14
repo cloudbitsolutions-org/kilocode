@@ -4,7 +4,7 @@ import path from "path"
 import type { MemorySchema } from "../schema"
 import { MemorySlug } from "../slug"
 
-export namespace MemoryPaths {
+export namespace MemoryStoragePaths {
   export type Ctx = {
     directory: string
     worktree: string
@@ -124,3 +124,5 @@ export namespace MemoryPaths {
     return paths.corrections
   }
 }
+
+export { MemoryStoragePaths as MemoryPaths }

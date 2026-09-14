@@ -16,7 +16,7 @@ function message(err: unknown) {
   return MemoryRedact.text(err instanceof Error ? err.message : String(err)).slice(0, 200)
 }
 
-export namespace MemoryTurn {
+export namespace MemoryEffectTurn {
   export type Reason = "completed" | "error" | "interrupted"
   type Input = {
     root: string
@@ -102,3 +102,5 @@ export namespace MemoryTurn {
     yield* Effect.sync(() => memory.dropLock(input.sessionID))
   })
 }
+
+export { MemoryEffectTurn as MemoryTurn }
