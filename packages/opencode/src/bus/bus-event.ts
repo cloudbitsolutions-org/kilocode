@@ -18,29 +18,46 @@ export function define<Type extends string, Properties extends Schema.Top>(
 }
 
 export function effectPayloads() {
-  return [
-    ...registry
-      .entries()
-      .map(([type, def]) =>
+  const payloads: any[] = []
+
+  for (const [type, def] of registry.entries()) {
+    if (def?.properties && (def.properties as any).ast) {
+      payloads.push(
         Schema.Struct({
           id: Schema.String,
           type: Schema.Literal(type),
           properties: def.properties,
         }).annotate({ identifier: `Event.${type}` }),
       )
-      .toArray(),
-    // kilocode_change start - expose current Effect events through legacy bus schemas
-    ...EventManifest.Latest.values()
-      .map((definition) =>
-        Schema.Struct({
-          id: Schema.String,
-          type: Schema.Literal(definition.type),
-          properties: definition.data,
-        }).annotate({ identifier: `Event.${definition.type}` }),
-      )
-      .toArray(),
-    // kilocode_change end
-  ]
+    } else {
+      console.warn(`[bus-event] Skipping registry event without valid schema: ${type}`, def)
+    }
+  }
+
+  // kilocode_change start - expose current Effect events through legacy bus schemas
+  try {
+    const latestValues = EventManifest?.Latest?.values?.()
+    if (latestValues) {
+      for (const definition of latestValues) {
+        if (definition?.data && (definition.data as any).ast) {
+          payloads.push(
+            Schema.Struct({
+              id: Schema.String,
+              type: Schema.Literal(definition.type),
+              properties: definition.data,
+            }).annotate({ identifier: `Event.${definition.type}` }),
+          )
+        } else {
+          console.warn(`[bus-event] Skipping EventManifest event without valid data schema: ${definition?.type}`)
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[bus-event] Failed to read EventManifest.Latest:", err)
+  }
+  // kilocode_change end
+
+  return payloads
 }
 
 export * as BusEvent from "./bus-event"

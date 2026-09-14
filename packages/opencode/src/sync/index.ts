@@ -407,10 +407,11 @@ function process<Def extends Definition>(
 }
 
 export function effectPayloads() {
-  return [
-    ...registry
-      .entries()
-      .map(([type, def]) =>
+  const payloads: any[] = []
+
+  for (const [type, def] of registry.entries()) {
+    if (def?.schema && (def.schema as any).ast) {
+      payloads.push(
         EffectSchema.Struct({
           type: EffectSchema.Literal("sync"),
           name: EffectSchema.Literal(type),
@@ -420,25 +421,35 @@ export function effectPayloads() {
           data: def.schema,
         }).annotate({ identifier: `SyncEvent.${type}` }),
       )
-      .toArray(),
-    ...EventManifest.Latest.values()
-      .filter(
-        (definition) =>
-          definition.durable !== undefined && // kilocode_change
-          !registry.has(versionedType(definition.type, definition.durable.version)), // kilocode_change
-      )
-      .map((definition) =>
-        EffectSchema.Struct({
-          type: EffectSchema.Literal("sync"),
-          name: EffectSchema.Literal(versionedType(definition.type, definition.durable!.version)), // kilocode_change
-          id: EffectSchema.String,
-          seq: EffectSchema.Finite,
-          aggregateID: EffectSchema.Literal(definition.durable!.aggregate), // kilocode_change
-          data: definition.data,
-        }).annotate({ identifier: `SyncEvent.${definition.type}` }),
-      )
-      .toArray(),
-  ]
+    }
+  }
+
+  try {
+    const latestValues = EventManifest?.Latest?.values?.()
+    if (latestValues) {
+      for (const definition of latestValues) {
+        if (
+          definition.durable !== undefined &&
+          !registry.has(versionedType(definition.type, definition.durable.version)) &&
+          definition?.data &&
+          (definition.data as any).ast
+        ) {
+          payloads.push(
+            EffectSchema.Struct({
+              type: EffectSchema.Literal("sync"),
+              name: EffectSchema.Literal(versionedType(definition.type, definition.durable.version)),
+              id: EffectSchema.String,
+              seq: EffectSchema.Finite,
+              aggregateID: EffectSchema.Literal(definition.durable.aggregate),
+              data: definition.data,
+            }).annotate({ identifier: `SyncEvent.${definition.type}` }),
+          )
+        }
+      }
+    }
+  } catch {}
+
+  return payloads
 }
 
 export * as SyncEvent from "."

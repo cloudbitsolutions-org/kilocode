@@ -25,6 +25,10 @@ export namespace MemoryEvents {
   /** Route the package event sink through the host Bus. Best-effort: events are dropped when no
    * instance context is bound, since Bus.publish requires it. */
   export function install() {
+    if (typeof Core?.setSink !== "function") {
+      log.warn("MemoryEvents.setSink not available, skipping memory event sink wiring")
+      return
+    }
     Core.setSink(async (input) => {
       const def = input.event === "updated" ? Updated : input.event === "error" ? Error : Status
       const ctx = captureInstance() // Bus.publish requires the instance context; events are best-effort if it is absent
