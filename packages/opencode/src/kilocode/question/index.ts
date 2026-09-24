@@ -77,14 +77,9 @@ export namespace KiloQuestion {
     })
 
   /**
-   * Auto-dismiss when a newer prompt is already queued on this session — a
-   * tool that calls `Question.ask` after the queue event would otherwise block
-   * the run while the user waits for their queued prompt to take over.
+   * In LeviOS, queued prompts wait in FIFO order and do NOT auto-dismiss questions.
+   * Tools calling `Question.ask` must proceed so the user can interactively answer.
    */
-  export const guardFollowup = <E>(sessionID: SessionID, makeError: () => E) =>
-    Effect.gen(function* () {
-      if (!KiloSessionPromptQueue.hasFollowup(sessionID)) return
-      log.info("auto-dismissed — followup queued", { sessionID })
-      return yield* Effect.fail(makeError())
-    })
+  export const guardFollowup = <E>(_sessionID: SessionID, _makeError: () => E) =>
+    Effect.void
 }

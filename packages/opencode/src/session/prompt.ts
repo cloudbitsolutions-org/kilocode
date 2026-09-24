@@ -1498,7 +1498,8 @@ export const layer = Layer.effect(
         if (!ticket.running()) return message
         const dismiss = Effect.gen(function* () {
           yield* Effect.promise(() => Suggestion.dismissAll(input.sessionID)).pipe(Effect.orDie)
-          yield* question.dismissAll(input.sessionID)
+          // Do not dismiss questions on queue: questions should remain interactive
+          // and let the user answer while the prompt waits in the queue.
         })
         if (input.noReply === true) {
           yield* dismiss
@@ -1511,9 +1512,18 @@ export const layer = Layer.effect(
           input.sessionID,
           message.info.id,
           bridge.run(
-            loop({ sessionID: input.sessionID, snapshotInitialization: input.snapshotInitialization }, ticket).pipe(
-              Effect.orDie,
-            ),
+            Effect.gen(function* () {
+              const now = Date.now()
+              const updatedMsg = {
+                ...message.info,
+                time: { ...message.info.time, created: now },
+              }
+              yield* sessions.updateMessage(updatedMsg).pipe(Effect.ignore)
+              return yield* loop(
+                { sessionID: input.sessionID, snapshotInitialization: input.snapshotInitialization },
+                ticket,
+              )
+            }).pipe(Effect.orDie),
           ), // kilocode_change
           bridge.run(lastAssistant(input.sessionID)),
           dismiss,
@@ -1968,17 +1978,7 @@ export const layer = Layer.effect(
             }
             // kilocode_change end
           }
-          // kilocode_change start — break out so a newer queued prompt can take over
-          // instead of starting another LLM step for the now-superseded turn. The
-          // current handle.process has fully drained (tokens + inline tool calls) by
-          // the time we get here, so nothing is cut off. The close reason is
-          // "superseded", not "interrupted": this is a deliberate queue handoff,
-          // not a premature stop, so clients must not flash an interruption warning.
-          if (KiloSessionPromptQueue.hasFollowup(sessionID)) {
-            closeReasons.set(sessionID, "superseded")
-            return "break" as const
-          }
-          // kilocode_change end
+          // Queued prompts wait in FIFO order until the active turn completely finishes.
           // kilocode_change start - guard against providers that end the stream
           // without a terminal stop_reason (e.g. an Anthropic-style message_delta
           // with stop_reason: null followed immediately by message_stop). Without

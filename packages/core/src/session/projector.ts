@@ -288,7 +288,7 @@ const layer = Layer.effectDiscard(
         yield* db
           .insert(MessageTable)
           .values({ id, session_id: sessionID, time_created, data })
-          .onConflictDoUpdate({ target: MessageTable.id, set: { data } })
+          .onConflictDoUpdate({ target: MessageTable.id, set: { data, time_created } })
           .run()
           .pipe(Effect.orDie)
       }),

@@ -401,7 +401,11 @@ const live: Layer.Layer<
         }),
         // kilocode_change end
         abortSignal: input.abort,
-        ...KiloLLM.timeout({ options: prepared.params.options, fallback: item.options, log: l }), // kilocode_change
+        ...KiloLLM.timeout({
+          options: prepared.params.options,
+          fallback: { chunkTimeout: 90_000, ...item.options },
+          log: l,
+        }), // kilocode_change
         headers: prepared.headers,
         maxRetries: input.retries ?? 0,
         allowSystemInMessages: true, // kilocode_change - system prompts are trusted and intentionally included in messages

@@ -22,6 +22,14 @@ export namespace KiloLLM {
     fallback?: Record<string, unknown>
     log?: Pick<Logger, "debug">
   }): { timeout?: { chunkMs: number } } {
+    if (
+      input.options["chunkTimeout"] === false ||
+      input.options["chunkTimeout"] === 0 ||
+      input.fallback?.["chunkTimeout"] === false ||
+      input.fallback?.["chunkTimeout"] === 0
+    ) {
+      return {}
+    }
     const value =
       typeof input.options["chunkTimeout"] === "number"
         ? input.options["chunkTimeout"]
