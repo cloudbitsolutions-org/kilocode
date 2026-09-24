@@ -112,7 +112,12 @@ export const ConfigOverlayResponse = Schema.Struct({
 export const ConfigSourcesResponse = Schema.Struct({ sources: Schema.Array(Source) }).annotate({
   identifier: "ConfigSourcesResponse",
 })
-export const ConfigModelStatePatch = Schema.Struct({ favorite: Schema.optional(Schema.Array(ModelRef)) })
+export const ConfigModelStatePatch = Schema.Struct({
+  favorite: Schema.optional(Schema.Array(ModelRef)),
+  model: Schema.optional(Schema.Record(Schema.String, ModelRef)),
+  recent: Schema.optional(Schema.Array(ModelRef)),
+  variant: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+})
 export const ConfigModelStateResponse = Schema.Struct({
   model: Schema.Record(Schema.String, ModelRef),
   recent: Schema.Array(ModelRef),

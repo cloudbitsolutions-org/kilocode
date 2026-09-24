@@ -192,7 +192,12 @@ export const configConsoleHandlers = HttpApiBuilder.group(InstanceHttpApi, "conf
       payload: typeof ConfigModelStatePatch.Type
     }) {
       return yield* Effect.promise(() =>
-        KilocodeModelState.update({ favorite: ctx.payload.favorite?.map((item) => ({ ...item })) }),
+        KilocodeModelState.update({
+          favorite: ctx.payload.favorite?.map((item) => ({ ...item })),
+          model: ctx.payload.model,
+          recent: ctx.payload.recent?.map((item) => ({ ...item })),
+          variant: ctx.payload.variant,
+        }),
       )
     })
 

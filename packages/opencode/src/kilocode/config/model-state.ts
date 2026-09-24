@@ -24,6 +24,9 @@ export namespace KilocodeModelState {
 
   export const Patch = z.object({
     favorite: Ref.array().optional(),
+    model: z.record(z.string(), Ref).optional(),
+    recent: Ref.array().optional(),
+    variant: z.record(z.string(), z.string()).optional(),
   })
   export type Patch = z.infer<typeof Patch>
 
@@ -42,6 +45,9 @@ export namespace KilocodeModelState {
     const next = {
       ...state,
       favorite: input.favorite ? refs(input.favorite) : state.favorite,
+      model: input.model ? { ...state.model, ...record(input.model) } : state.model,
+      recent: input.recent ? refs(input.recent) : state.recent,
+      variant: input.variant ? { ...state.variant, ...variant(input.variant) } : state.variant,
     }
     await Filesystem.writeJson(target(), next)
     return next
