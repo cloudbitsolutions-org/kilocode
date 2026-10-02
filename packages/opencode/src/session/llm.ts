@@ -403,7 +403,7 @@ const live: Layer.Layer<
         abortSignal: input.abort,
         ...KiloLLM.timeout({
           options: prepared.params.options,
-          fallback: { chunkTimeout: 90_000, ...item.options },
+          fallback: Object.keys(prepared.tools).length > 0 ? item.options : { chunkTimeout: 90_000, ...item.options },
           log: l,
         }), // kilocode_change
         headers: prepared.headers,
