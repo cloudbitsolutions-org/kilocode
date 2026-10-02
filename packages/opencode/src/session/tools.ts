@@ -1,6 +1,7 @@
 import { Agent } from "@/agent/agent"
 import { KiloSessionPrompt } from "@/kilocode/session/prompt" // kilocode_change
 import { GoalPolicy } from "@/kilocode/session/goal/policy" // kilocode_change
+import type { Goal } from "@/kilocode/session/goal/runner" // kilocode_change
 import { MemoryMarker } from "@/kilocode/memory/marker" // kilocode_change
 import { BoardNotice } from "@/kilocode/board/notice" // kilocode_change
 import { SessionV1 } from "@opencode-ai/core/v1/session"
@@ -31,6 +32,7 @@ import { Config } from "@/config/config"
 import { PermissionProvenance } from "@/kilocode/permission/provenance"
 import { McpApps } from "@/kilocode/mcp/apps"
 import { BoardEnabled } from "@/kilocode/board/enabled"
+import { KiloCodeMode } from "@/kilocode/tool/code-mode"
 import { errorMessage } from "@/util/error"
 import { Question } from "@/question"
 // kilocode_change end
@@ -59,6 +61,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   bypassAgentCheck: boolean
   messages: SessionV1.WithParts[]
   promptOps: TaskPromptOps
+  goalOps?: Goal.Ops // kilocode_change
   memoryCache: MemoryMarker.Cache // kilocode_change
   // kilocode_change start
   notify?: <T extends Tool.ExecuteResult>(tool: string, output: T, signal?: AbortSignal) => Effect.Effect<T>
@@ -80,12 +83,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const flags = yield* RuntimeFlags.Service
   const cfg = yield* config.get()
   const permissionOrigins = cfg.permission_origins
-  const notify = BoardEnabled.resolve({
-    config: cfg.experimental?.shared_agent_board,
-    flag: flags.experimentalSharedAgentBoard,
-  })
-    ? input.notify
-    : undefined
+  const notify = BoardEnabled.on(cfg, flags) ? input.notify : undefined
   type Output = Parameters<SessionProcessor.Handle["completeToolCall"]>[1]
   const finish = <T extends Output>(name: string, output: T, opts: ToolExecutionOptions) =>
     Effect.gen(function* () {
@@ -107,6 +105,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       model: input.model,
       bypassAgentCheck: input.bypassAgentCheck,
       promptOps: input.promptOps,
+      goalOps: input.goalOps, // kilocode_change
       sandboxed, // kilocode_change
       sandboxEscalation: false,
     }
@@ -184,7 +183,6 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     permission: input.session.permission,
     networkRestricted: restricted, // kilocode_change - let the registry suppress code-mode in restricted sessions
   })) {
-    if (!GoalPolicy.available(input.session.id, item.id)) continue // kilocode_change
     const base = ToolJsonSchema.fromTool(item)
     const schema = ProviderTransform.schema(input.model, base)
     tools[item.id] = tool({
@@ -194,6 +192,10 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
         return run.promise(
           Effect.gen(function* () {
             const ctx = context(args, options)
+            // kilocode_change start - stable schemas preserve the cache; goal restrictions apply at execution
+            if (!GoalPolicy.available(ctx.sessionID, item.id))
+              throw new Error(`Tool '${item.id}' is unavailable in the current Goal state.`)
+            // kilocode_change end
             yield* plugin.trigger(
               "tool.execute.before",
               { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID },
@@ -485,7 +487,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     })
   }
 
-  if (flags.experimentalCodeMode) return tools
+  if (KiloCodeMode.wanted(flags, cfg)) return tools // kilocode_change
 
   const mcpTools = restricted ? {} : yield* mcp.tools() // kilocode_change
   for (const [key, entry] of Object.entries(mcpTools)) {
@@ -516,7 +518,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
             ctx.sessionID,
             entry, // kilocode_change - retain the native entry's local/remote network authority marker
             Effect.gen(function* () {
-              yield* ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] })
+              yield* ctx.ask({ permission: key, metadata: { mcpInput: args }, patterns: ["*"], always: ["*"] })
               return yield* Effect.promise(() => execute(args, opts))
             }),
           ).pipe(
