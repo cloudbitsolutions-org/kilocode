@@ -85,6 +85,9 @@ function selectedV2WorkspaceID(
 }
 
 function defaultDirectory(request: HttpServerRequest.HttpServerRequest, url: URL): string {
+  if (process.env.WORKSPACE_ROOT) {
+    return process.env.WORKSPACE_ROOT
+  }
   return url.searchParams.get("directory") || request.headers["x-kilo-directory"] || process.cwd()
 }
 

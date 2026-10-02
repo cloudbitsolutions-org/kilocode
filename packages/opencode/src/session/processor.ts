@@ -818,7 +818,7 @@ const layer = Layer.effect(
 
         yield* Effect.forEach(
           Object.values(ctx.toolcalls),
-          (call) => Deferred.await(call.done).pipe(Effect.timeout("250 millis"), Effect.ignore),
+          (call) => Deferred.await(call.done).pipe(Effect.timeout("5000 millis"), Effect.ignore),
           { concurrency: "unbounded" },
         )
 

@@ -12,5 +12,6 @@ export function forkTargetDirectory(
 ): string | undefined {
   if (method !== "POST") return undefined
   if (!/^\/session\/[^/]+\/fork$/.test(url.pathname)) return undefined
+  if (process.env.WORKSPACE_ROOT) return process.env.WORKSPACE_ROOT
   return url.searchParams.get("directory") || headers["x-kilo-directory"] || undefined
 }

@@ -1,4 +1,4 @@
-import { Effect, Schema, Scope } from "effect" // kilocode_change - stable object reads do not use Option
+import { Cause, Effect, Schema, Scope } from "effect" // kilocode_change - stable object reads do not use Option
 import { NonNegativeInt } from "@opencode-ai/core/schema"
 import * as path from "path"
 import { Readable } from "stream" // kilocode_change
@@ -12,6 +12,8 @@ import { Config } from "@/config/config" // kilocode_change - optional configure
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { Instruction } from "../session/instruction"
 import { isPdfAttachment, sniffAttachmentMime } from "@/util/media"
+import { errorMessage } from "@/util/error"
+import { Permission } from "@/permission"
 // kilocode_change start
 import * as Encoding from "../kilocode/encoding"
 import { KiloReference } from "@/kilocode/reference/contains"
@@ -95,7 +97,24 @@ export const ReadTool = Tool.define<
         patterns: [...new Set([filepath, parent.value].map((item) => path.relative(worktree, item)))],
         always: ["*"],
         metadata: {},
-      })
+      }).pipe(
+        // In headless subagents, permission requests fail immediately with DeniedError.
+        // Catch DeniedError so it degrades gracefully to a "File not found" error instead of crashing the turn.
+        Effect.catchCause((cause) => {
+          const err = Cause.squash(cause)
+          if (
+            err instanceof Permission.DeniedError ||
+            (typeof err === "object" &&
+              err !== null &&
+              ("_tag" in err
+                ? err._tag === "PermissionDeniedError" || err._tag === "DeniedError"
+                : "name" in err && err.name === "DeniedError"))
+          ) {
+            return Effect.void
+          }
+          return Effect.failCause(cause)
+        }),
+      )
       return yield* Effect.fail(new Error(`File not found: ${filepath}`))
     })
     // kilocode_change end
@@ -395,7 +414,22 @@ export const ReadTool = Tool.define<
       description: DESCRIPTION,
       parameters: Parameters,
       execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context<Metadata>) =>
-        run(params, ctx).pipe(Effect.orDie),
+        run(params, ctx).pipe(
+          Effect.catch((err) =>
+            Effect.succeed({
+              title: path.basename(params.filePath),
+              output: `File not found or unreadable: ${params.filePath} (${errorMessage(err)})`,
+              metadata: { preview: "", truncated: false, loaded: [] },
+            }),
+          ),
+          Effect.catchDefect((defect) =>
+            Effect.succeed({
+              title: path.basename(params.filePath),
+              output: `File not found or unreadable: ${params.filePath} (${errorMessage(defect)})`,
+              metadata: { preview: "", truncated: false, loaded: [] },
+            }),
+          ),
+        ),
     }
   }),
 )

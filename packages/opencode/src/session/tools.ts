@@ -31,6 +31,8 @@ import { Config } from "@/config/config"
 import { PermissionProvenance } from "@/kilocode/permission/provenance"
 import { McpApps } from "@/kilocode/mcp/apps"
 import { BoardEnabled } from "@/kilocode/board/enabled"
+import { errorMessage } from "@/util/error"
+import { Question } from "@/question"
 // kilocode_change end
 import { isRecord } from "@/util/record"
 import { RuntimeFlags } from "@/effect/runtime-flags"
@@ -198,7 +200,24 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               { args },
             )
             // kilocode_change start
-            const result = yield* SandboxPolicy.executeTool(ctx.sessionID, item, item.execute(args, ctx))
+            const result = yield* SandboxPolicy.executeTool(ctx.sessionID, item, item.execute(args, ctx)).pipe(
+              Effect.catchIf(
+                (err) => !(err instanceof Permission.RejectedError || err instanceof Question.RejectedError),
+                (err) =>
+                  Effect.succeed<Tool.ExecuteResult>({
+                    title: item.id,
+                    metadata: { error: true },
+                    output: `Tool error (${item.id}): ${errorMessage(err)}`,
+                  }),
+              ),
+              Effect.catchDefect((defect) =>
+                Effect.succeed<Tool.ExecuteResult>({
+                  title: item.id,
+                  metadata: { error: true },
+                  output: `Tool error (${item.id}): ${errorMessage(defect)}`,
+                }),
+              ),
+            )
             // kilocode_change end
             const output = {
               ...result,
