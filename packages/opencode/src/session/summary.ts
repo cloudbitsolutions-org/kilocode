@@ -108,7 +108,7 @@ const layer = Layer.effect(
     }) {
       const all = yield* sessions.messages({ sessionID: input.sessionID }).pipe(Effect.orDie)
       if (!all.length) return
-      if ((yield* config.get()).snapshot === false) return // kilocode_change - respect snapshot config toggle
+      if (!Snapshot.isSnapshotEnabled((yield* config.get()).snapshot)) return // kilocode_change - respect snapshot config toggle
 
       // kilocode_change start - preserve imported cumulative diffs when summarizing cloud-forked sessions
       const base = yield* readSessionDiffBase(storage, input.sessionID)

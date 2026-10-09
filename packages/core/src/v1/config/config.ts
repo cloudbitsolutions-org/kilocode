@@ -79,7 +79,7 @@ export const Info = Schema.Struct({
   watcher: Schema.optional(Schema.Struct({ ignore: Schema.optional(Schema.mutable(Schema.Array(Schema.String))) })),
   snapshot: Schema.optional(Schema.Boolean).annotate({
     description:
-      "Enable or disable snapshot tracking. When false, filesystem snapshots are not recorded and undoing or reverting will not undo/redo file changes. Defaults to true.",
+      "Enable or disable snapshot tracking. When false or omitted, filesystem snapshots are not recorded and undoing or reverting will not undo/redo file changes. Defaults to false.",
   }),
   // kilocode_change start - machine-wide session retention policy, owned by the backend
   retention: Schema.optional(

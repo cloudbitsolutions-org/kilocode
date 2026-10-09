@@ -82,7 +82,7 @@ const layer = Layer.effect(
         ? "restored"
         : ctx.project.vcs !== "git"
           ? "not-a-git-repo"
-          : (yield* config.get()).snapshot === false
+          : !Snapshot.isSnapshotEnabled((yield* config.get()).snapshot)
             ? "snapshots-disabled"
             : "unavailable"
       // kilocode_change end

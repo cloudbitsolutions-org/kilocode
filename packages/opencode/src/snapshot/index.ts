@@ -76,6 +76,12 @@ export interface Interface {
   readonly diffFile: (from: string, to: string, file: string) => Effect.Effect<FileDiff | undefined> // kilocode_change - authoritative full-content detail
 }
 
+export const isSnapshotEnabled = (configSnapshot: boolean | undefined): boolean => {
+  if (Flag.KILO_DISABLE_SNAPSHOT) return false
+  if (Flag.KILO_ENABLE_SNAPSHOT) return configSnapshot !== false
+  return configSnapshot === true
+}
+
 export class Service extends Context.Service<Service, Interface>()("@opencode/Snapshot") {}
 
 // kilocode_change start
@@ -224,7 +230,7 @@ export const layer: Layer.Layer<Service, never, Requirements> =
           const enabled = Effect.fnUntraced(function* () {
             if (state.vcs !== "git") return false
             if (Flag.KILO_CLIENT === "acp") return false // kilocode_change - ACP clients do not support snapshots
-            return (yield* config.get()).snapshot !== false
+            return isSnapshotEnabled((yield* config.get()).snapshot)
           })
 
           const excludes = Effect.fnUntraced(function* () {
@@ -359,7 +365,7 @@ export const layer: Layer.Layer<Service, never, Requirements> =
           // kilocode_change end
 
           const cleanup = Effect.fnUntraced(function* () {
-            if ((yield* config.get()).snapshot === false) return undefined // kilocode_change - skip locks for disabled periodic cleanup too
+            if (!isSnapshotEnabled((yield* config.get()).snapshot)) return undefined // kilocode_change - skip locks for disabled periodic cleanup too
             return yield* locked(
               Effect.gen(function* () {
                 if (!(yield* enabled())) return
@@ -973,7 +979,7 @@ export const layer: Layer.Layer<Service, never, Requirements> =
         // kilocode_change start - isolate turn-facing snapshot work from poisoned locks
         track: Effect.fn("Snapshot.track")(function* (opts) {
           // Check before starting progress or waiting on an earlier snapshot's lock.
-          if ((yield* config.get()).snapshot === false) return undefined
+          if (!isSnapshotEnabled((yield* config.get()).snapshot)) return undefined
           const ctx = yield* InstanceState.context
           const guard = trackState(ctx.worktree)
           return yield* KiloSnapshotTrack.protect({
@@ -990,7 +996,7 @@ export const layer: Layer.Layer<Service, never, Requirements> =
           })
         }),
         patch: Effect.fn("Snapshot.patch")(function* (hash: string) {
-          if ((yield* config.get()).snapshot === false) return { hash, files: [] }
+          if (!isSnapshotEnabled((yield* config.get()).snapshot)) return { hash, files: [] }
           const ctx = yield* InstanceState.context
           const guard = trackState(ctx.worktree)
           return yield* KiloSnapshotTrack.protect({
@@ -1002,15 +1008,19 @@ export const layer: Layer.Layer<Service, never, Requirements> =
         }),
         // kilocode_change end
         restore: Effect.fn("Snapshot.restore")(function* (snapshot: string) {
+          if (!isSnapshotEnabled((yield* config.get()).snapshot)) return undefined
           return yield* InstanceState.useEffect(state, (s) => s.restore(snapshot))
         }),
         revert: Effect.fn("Snapshot.revert")(function* (patches: Patch[]) {
+          if (!isSnapshotEnabled((yield* config.get()).snapshot)) return undefined
           return yield* InstanceState.useEffect(state, (s) => s.revert(patches))
         }),
         diff: Effect.fn("Snapshot.diff")(function* (hash: string) {
+          if (!isSnapshotEnabled((yield* config.get()).snapshot)) return ""
           return yield* InstanceState.useEffect(state, (s) => s.diff(hash))
         }),
         diffFull: Effect.fn("Snapshot.diffFull")(function* (from: string, to: string) {
+          if (!isSnapshotEnabled((yield* config.get()).snapshot)) return []
           // kilocode_change start - cache full diffs at the service boundary
           if (from === to) return []
           const directory = yield* InstanceState.directory
@@ -1034,6 +1044,7 @@ export const layer: Layer.Layer<Service, never, Requirements> =
         }),
         // kilocode_change start - authoritative full-content detail for editor diff tabs
         diffFile: Effect.fn("Snapshot.diffFile")(function* (from: string, to: string, file: string) {
+          if (!isSnapshotEnabled((yield* config.get()).snapshot)) return undefined
           if (from === to) return undefined
           return yield* InstanceState.useEffect(state, (s) => s.diffFile(from, to, file))
         }),
