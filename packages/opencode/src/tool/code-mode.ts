@@ -10,6 +10,7 @@ import { Permission } from "@/permission"
 import { Plugin } from "@/plugin"
 import * as SandboxPolicy from "@/kilocode/sandbox/policy" // kilocode_change
 import { EffectBridge } from "@/effect/bridge" // kilocode_change
+import { callerMeta } from "@/kilocode/mcp/caller-meta" // kilocode_change
 
 export const CODE_MODE_TOOL = "execute"
 
@@ -140,6 +141,7 @@ const invokeChildTool = Effect.fn("CodeMode.invokeChildTool")(function* (input: 
   callID: string
   ctx: Tool.Context
   bridge: EffectBridge.Shape // kilocode_change
+  directory: string // kilocode_change - the session's, for the call's _meta
 }) {
   yield* input.plugin.trigger(
     "tool.execute.before",
@@ -156,7 +158,13 @@ const invokeChildTool = Effect.fn("CodeMode.invokeChildTool")(function* (input: 
           // Deliberately mirrors McpCatalog.convertTool's transport call so the MCP service stays free of tool-loop concerns.
           return yield* Effect.promise(async () => {
             const raw = await input.entry.tool.client.callTool(
-              { name: input.entry.tool.def.name, arguments: input.args },
+              // kilocode_change start - name the calling session turn in the call's _meta
+              {
+                name: input.entry.tool.def.name,
+                arguments: input.args,
+                _meta: callerMeta({ sessionID: input.ctx.sessionID, messageID: input.ctx.messageID, directory: input.directory }),
+              },
+              // kilocode_change end
               CallToolResultSchema,
               {
                 resetTimeoutOnProgress: true,
@@ -240,6 +248,7 @@ export const CodeModeTool = Tool.define(
               callID: `${ctx.callID ?? entry.key}/${childCalls}`,
               ctx,
               bridge,
+              directory: session.directory, // kilocode_change
             })
             return projectMcpResult(result, (attachment: Attachment) => void attachments.push(attachment))
           }).pipe(

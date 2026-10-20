@@ -31,6 +31,7 @@ import { ModelV2 } from "@opencode-ai/core/model"
 import { Config } from "@/config/config"
 import { PermissionProvenance } from "@/kilocode/permission/provenance"
 import { McpApps } from "@/kilocode/mcp/apps"
+import { callerMeta } from "@/kilocode/mcp/caller-meta"
 import { BoardEnabled } from "@/kilocode/board/enabled"
 import { KiloCodeMode } from "@/kilocode/tool/code-mode"
 import { errorMessage } from "@/util/error"
@@ -491,7 +492,11 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
 
   const mcpTools = restricted ? {} : yield* mcp.tools() // kilocode_change
   for (const [key, entry] of Object.entries(mcpTools)) {
-    const item = McpCatalog.convertTool(entry.def, entry.client, entry.timeout)
+    // kilocode_change start - name the calling session turn in the call's _meta
+    const item = McpCatalog.convertTool(entry.def, entry.client, entry.timeout, () =>
+      callerMeta({ sessionID: input.session.id, messageID: input.processor.message.id, directory: input.session.directory }),
+    )
+    // kilocode_change end
     const execute = item.execute
     if (!execute) continue
 
