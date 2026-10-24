@@ -13,6 +13,24 @@ import * as Log from "@opencode-ai/core/util/log"
 const log = Log.create({ service: "kilocode.system-prompt" })
 
 export namespace KilocodeSystemPrompt {
+  // levios_change start - the host's standing instruction (LeviOS's platform guard)
+  /**
+   * Set in-process by the host that embeds the engine (levi-server, at startup) and added to every
+   * session's system prompt. It lives in memory, not in a file, so nothing in the workspace can
+   * change or remove it.
+   */
+  let hostInstruction: string | undefined
+
+  export function setHostInstruction(text: string) {
+    if (!text.trim()) throw new Error("The host instruction is empty")
+    hostInstruction = text
+  }
+
+  export function currentHostInstruction() {
+    return hostInstruction
+  }
+  // levios_change end
+
   export function shouldIncludePersona(agent: string) {
     return agent !== "title" && agent !== "branch-name"
   }
@@ -31,6 +49,8 @@ export namespace KilocodeSystemPrompt {
         ...staticEnvLines(input.editor),
         `</env>`,
       ].join("\n"),
+      // levios_change - the host's standing instruction, in every session
+      ...(hostInstruction ? [hostInstruction] : []),
     ]
   }
 
