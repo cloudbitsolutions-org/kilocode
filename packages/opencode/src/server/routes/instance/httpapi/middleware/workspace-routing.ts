@@ -1,3 +1,4 @@
+import path from "node:path"
 import { WorkspaceV2 } from "@opencode-ai/core/workspace"
 import type { Target } from "@/control-plane/types"
 import { Workspace } from "@/control-plane/workspace"
@@ -85,10 +86,20 @@ function selectedV2WorkspaceID(
 }
 
 function defaultDirectory(request: HttpServerRequest.HttpServerRequest, url: URL): string {
-  if (process.env.WORKSPACE_ROOT) {
-    return process.env.WORKSPACE_ROOT
+  const requested = url.searchParams.get("directory") || request.headers["x-kilo-directory"]
+  const root = process.env.WORKSPACE_ROOT
+  if (root) {
+    if (requested) {
+      const resolvedRoot = path.resolve(root)
+      const resolvedTarget = path.resolve(resolvedRoot, requested)
+      const rel = path.relative(resolvedRoot, resolvedTarget)
+      if (rel === "" || (!rel.startsWith("..") && rel !== ".." && !path.isAbsolute(rel))) {
+        return resolvedTarget
+      }
+    }
+    return root
   }
-  return url.searchParams.get("directory") || request.headers["x-kilo-directory"] || process.cwd()
+  return requested || process.cwd()
 }
 
 function shouldStayOnControlPlane(request: HttpServerRequest.HttpServerRequest, url: URL): boolean {
