@@ -97,6 +97,7 @@ import { KiloSessionControl } from "@/kilocode/session/control" // kilocode_chan
 import { Goal } from "@/kilocode/session/goal/runner" // kilocode_change
 import { GoalPolicy } from "@/kilocode/session/goal/policy" // kilocode_change
 import { GoalState } from "@/kilocode/session/goal/state" // kilocode_change
+import { model as modelEnv } from "@/kilocode/process/env" // levios_change
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -750,8 +751,7 @@ export const layer = Layer.effect(
               )
               const cmd = ChildProcess.make(sh, args, {
                 cwd,
-                extendEnv: true,
-                env: { ...shellEnv.env, TERM: "dumb" },
+                env: modelEnv({ ...shellEnv.env, TERM: "dumb" }), // levios_change - shell commands must not inherit backend credentials
                 stdin: "ignore",
                 forceKillAfter: "3 seconds",
               })

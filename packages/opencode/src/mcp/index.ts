@@ -413,10 +413,13 @@ const layer = Layer.effect(
         args: finalArgs, // kilocode_change
         cwd,
         // kilocode_change start - local MCPs must not inherit backend credentials
-        env: modelEnv({
-          ...(cmd === "opencode" ? { BUN_BE_BUN: "1" } : {}),
-          ...mcp.environment,
-        }),
+        env: modelEnv(
+          {
+            ...(cmd === "opencode" ? { BUN_BE_BUN: "1" } : {}),
+            ...mcp.environment,
+          },
+          { kind: "mcp", server: key, command: cmd }, // levios_change - the host gives its own MCP servers their credential
+        ),
         // kilocode_change end
       })
       // kilocode_change start - a piped stderr stream must be consumed or verbose MCP servers can block
